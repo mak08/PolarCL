@@ -19,6 +19,6 @@ PolarSeal currently supports
   * application/xml,application/x-www-form-urlencoded
 * Logging
 
-Furthermore, Polar Seal supports server-side programming in Common Lisp 
+Furthermore, PolarSeal supports server-side programming in Common Lisp 
 * Registering handlers for serving static and dynamic content
 * Easy registration of Lisp functions to be called from XHR GET requests, for example.
