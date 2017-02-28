@@ -2,7 +2,7 @@
 A web server based on mbedTLS
 
 ## Features
-PolarSeal is a web server based on [mbedTLS](https://tls.mbed.org/) (formerly known as PolarSSL). It still work in progress.
+PolarSeal is a web server based on [mbedTLS](https://www.mbed.com/en/technologies/security/mbed-tls/) (formerly known as PolarSSL). It is still work in progress.
 PolarSeal currently supports
 * Secure (TLS) and plain socket connections
 * Multithreading using a thread pool or on-demand thread creation
