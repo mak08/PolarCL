@@ -1,0 +1,26 @@
+;;; -*- lisp -*- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Description
+;;; Author         Michael Kappert
+;;; Created        22/03/2000 11:15:16
+;;; Last Modified  <michael 2017-02-24 00:19:32>
+
+(dm:defmodule "polarcl"
+    :source-path "polarcl/"
+    :source-ext "cl"
+    :depends-on ("util" "zlib" "mbedtls" "regex")
+    :components ((:serial
+                  (:file "uri-package")
+                  (:file "http-package")
+                  (:file "macros")
+                  (:file "url-parser")
+                  (:file "octet-streams")
+                  (:file "headers")
+                  (:file "messages")
+                  (:file "server")
+                  (:file "client")
+                  (:file "mime-types")
+                  (:file "json")
+                  (:file "handlers"))))
+
+;;; EOF
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

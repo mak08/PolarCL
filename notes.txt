@@ -1,0 +1,90 @@
+================================================================================
+Notes
+--------------------------------------------------------------------------------
+
+Dependencies
+------------
+-	Quicklisp modules:
+	-	usocket
+	-	cl-base64
+	-	net.uri
+-	C libraries
+	-	mbedTLS
+		=>	Use CMake method to install; requires Perl
+
+
+Standard request processing
+---------------------------
+ 
+The standard request processing works as follows:
+ 
+Registering handlers
+-   GF REGISTER-HANDLER is called to register instances of class STANDARD-REQUEST-HANDLER (or a subclass).
+    The standard-request-handler has a field request-handler-match containing a function
+    (request)->T/nil that indicates if the handler should handle a given request (based on the request path, for example / ex "Location" )
+ 
+-   The HTTP/HTTPS server reads request data from the socket (complete, headers + body)
+-   A instance of standard-http-<verb>-request is created
+-   GF FIND-HANDLER is called on the connection and request instance.
+    The default method calls the match function of all registered handlers until a handler accepts (match function returns T).
+-   GF HANDLE-REQUEST is called on the handler and request.
+    The default method performs redirection and authentication based on handler-provided functions.
+    It then creates a HTTP-RESPONSE object and calls GF HANDLE-RESPONSE method on
+    the handler, request and response. CAUTION: GET-RESPONSE is a HTTP client function!
+ 
+ 
+GFs and Functions
+ 
+Registering
+    REGISTER-HANDLER (handler) => T; warning if a previous registration is superseded
+Dispatching
+    HANDLER-MATCHES-P (connection request) => T or nil
+    FIND-HANDLER (connection request) => <handler> or nil
+Handling
+    HANDLE-REQUEST (handler request) => <response> or error
+    HANDLE-RESPONSE (handler request response) => T or error
+ 
+Authentication
+    AUTHENTICATE
+ 
+Redirection
+    MAKE-REDIRECTOR
+    REDIRECT-DECLINE
+    REDIRECT-USE-HTTPS
+ 
+
+;; siege  -c50 -b -t 20s http://localhost:8080/
+  seconds  |     gc     |     consed     |   calls   |  sec/call  |  name  
+----------------------------------------------------------------
+   253.767 |      0.925 | 18,143,343,312 |    19,240 |   0.013190 | MBEDTLS::MEMSET
+   196.897 |      0.357 | 15,468,145,008 |    19,239 |   0.010234 | MBEDTLS::MAKE-CBUFFER
+    82.486 |      2.354 |  9,264,744,736 |   134,671 |   0.000612 | MBEDTLS::READ-FROM-STREAM
+    62.072 |      1.619 |  7,295,855,696 |   133,574 |   0.000465 | HTTP::WRITE-MESSAGE-LINE
+    59.015 |      2.422 |  4,872,015,904 |    19,240 |   0.003067 | HTTP::GET-REQUEST
+    55.294 |      0.252 |  5,522,907,216 |   306,715 |   0.000180 | MBEDTLS::MBEDTLS-NET-SEND
+    53.820 |      0.612 |  2,864,309,584 |         1 |  53.819996 | HTTP::HTTP-MULTITHREAD-SERVER
+    36.303 |      0.413 |  4,000,739,136 |   134,671 |   0.000270 | MBEDTLS:GET-LINE
+    35.021 |      0.046 |  2,413,180,272 |   306,715 |   0.000114 | MBEDTLS::CONVERT-UINT8-ARRAY-TO-FOREIGN
+    27.994 |      0.065 |  2,953,408,992 |   306,715 |   0.000091 | MBEDTLS:WRITE-TO-STREAM
+    22.054 |      0.767 |  2,288,312,544 |    19,238 |   0.001146 | HTTP::HANDLE-REQUEST
+    21.384 |      0.106 |  1,135,815,200 |   884,972 |   0.000024 | MBEDTLS::BUFFER
+    19.497 |      0.461 |  2,110,502,896 |    19,258 |   0.001012 | MBEDTLS:ACCEPT
+    19.116 |      0.059 |    822,714,432 |   769,541 |   0.000025 | MBEDTLS::BUFPOS
+    15.071 |      0.404 |  1,817,202,512 |    19,239 |   0.000783 | HTTP::HANDLE-CONNECTION
+    14.391 |      0.570 |              0 |        20 |   0.719535 | HTTP::HANDLER-THREAD
+    11.490 |      0.041 |  1,506,935,200 |    19,238 |   0.000597 | HTTP::GET-HANDLER
+     7.690 |      0.288 |    805,705,888 |    19,238 |   0.000400 | HTTP::WRITE-BODY
+     6.851 |      0.192 |    820,008,992 |    19,239 |   0.000356 | MBEDTLS:CLOSE-STREAM
+     6.757 |      0.020 |    378,572,496 |   269,338 |   0.000025 | (SETF MBEDTLS::BUFPOS)
+     6.638 |      0.030 |    707,096,560 |   345,194 |   0.000019 | MBEDTLS::SOCKET
+     6.167 |      0.011 |    281,198,928 |   230,856 |   0.000027 | HTTP::LOCATION-PATH
+     6.041 |      0.180 |    654,839,184 |    19,238 |   0.000314 | HTTP::FORMAT-REQUEST-INFO
+     5.419 |      0.022 |    645,959,600 |    37,385 |   0.000145 | HTTP::WRITE-RESPONSE
+     4.767 |      0.081 |    470,457,824 |    37,385 |   0.000128 | HTTP::MAKE-HTTP-RESPONSE
+     4.545 |      0.056 |    573,441,904 |    38,475 |   0.000118 | HTTP::SET-HTTP-HEADER
+     4.439 |      0.000 |    447,246,848 |    19,238 |   0.000231 | PURI:URI-PARSED-PATH
+     3.776 |      0.003 |    477,746,000 |   134,666 |   0.000028 | HTTP::GET-LOCATION
+     3.605 |      0.008 |    335,192,128 |   153,902 |   0.000023 | HTTP:HEADERS
+     3.360 |      0.017 |    288,762,816 |   134,669 |   0.000025 | (SETF MBEDTLS::BUFFER)
+     3.163 |      0.038 |    324,139,824 |    19,239 |   0.000164 | PURI:PARSE-URI
+     2.852 |      0.000 |    215,370,400 |    57,714 |   0.000049 | HTTP:HTTP-HEADER
