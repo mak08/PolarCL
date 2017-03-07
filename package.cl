@@ -1,14 +1,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling XMLHttpRequest-style http requests
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-02-24 00:11:43>
+;;; Last Modified  <michael 2017-03-08 00:13:56>
 
 (defpackage "POLARCL"
   (:use "COMMON-LISP"
         "CFFI"
         "BABEL"
         "RDPARSE"
-        "URI"
         #+sbcl "SB-MOP"
         #+ccl "CCL"
         #+clisp "CLOS"
