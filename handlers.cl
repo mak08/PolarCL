@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-02 00:39:34>
+;;; Last Modified <michael 2017-03-10 00:38:42>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -106,7 +106,7 @@
    (query :accessor redirector-query :initarg :query)))
 
 (defclass handler (request-processor)
-  ((realm :reader handler-realm :initarg :realm :initform "bitweide.de")
+  ((realm :reader handler-realm :initarg :realm :initform "localhost")
    (authentication :reader handler-authentication :initarg :authentication :initform nil)))
 
 (defmethod print-object ((thing handler) stream)
@@ -234,9 +234,11 @@
 (defgeneric match-filter-path (filter request))
 
 (defmethod match-filter-path ((filter exact-filter) request)
+  (log2:trace "filter path: ~a request path: ~a" (filter-path filter) (http-path request))
   (string= (http-path request) (filter-path filter)))
 
 (defmethod match-filter-path ((filter prefix-filter) request)
+  (log2:trace "filter path: ~a request path: ~a" (filter-path filter) (http-path request))
   (let* ((prefix (filter-path filter))
          (length (length prefix))
          (path (http-path request))
@@ -246,6 +248,7 @@
              (eql (aref path mismatch) #\/)))))
 
 (defmethod match-filter-path ((filter regex-filter) request)
+  (log2:trace "filter path: ~a request path: ~a" (filter-path filter) (http-path request))
   (regex:match-regex (filter-path filter) (http-path request)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
