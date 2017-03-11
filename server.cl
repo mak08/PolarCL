@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-04 20:38:03>
+;;; Last Modified  <michael 2017-03-11 20:29:49>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -50,10 +50,6 @@
    (log-level
     :reader server-log-level :initarg :log-level :initform 1
     :documentation "PolarCL loglevel")
-   (log-file
-    :reader server-log-file :initarg :log-file
-    :initform (merge-pathnames (make-pathname :directory '(:relative "tmp") :name "http-server" :type "log")
-                               (user-homedir-pathname)))
    (mt-method
     :reader server-mt-method :initarg :mt-method :initform :pooled
     :documentation "Start threads on-demand (:ondemand) or use thread pool (:pooled)")
@@ -112,27 +108,23 @@
 
 (defun run-http-server (http-server &key (background t))
   (flet ((run ()
-           (with-open-file (logstream (server-log-file http-server)
-                                      :direction :output
-                                      :if-exists :supersede
-                                      #+ccl :sharing #+ccl :lock)
-             (handler-case 
-                 (unwind-protect
-                      (progn
-                        (setf (socket-server http-server)
-                              (create-server http-server))
-                        (setf (server-running http-server) t)
-                        (ecase (server-mt-method http-server)
-                          (:pooled
-                           (server-loop-pooled http-server))
-                          (:ondemand
-                           (server-loop-ondemand http-server))))
-                   (when (socket-server http-server)
-                     (log2:info "Releasing ~a:~a~%" (server-hostname http-server) (server-port http-server))
-                     (mbedtls:close-socket (socket-server http-server))
-                     (setf (socket-server http-server) nil)))
-               (error (e)
-                 (log2:error "### RUN-HTTP-SERVER Error: ~a" e))))))
+           (handler-case 
+               (unwind-protect
+                    (progn
+                      (setf (socket-server http-server)
+                            (create-server http-server))
+                      (setf (server-running http-server) t)
+                      (ecase (server-mt-method http-server)
+                        (:pooled
+                         (server-loop-pooled http-server))
+                        (:ondemand
+                         (server-loop-ondemand http-server))))
+                 (when (socket-server http-server)
+                   (log2:info "Releasing ~a:~a~%" (server-hostname http-server) (server-port http-server))
+                   (mbedtls:close-socket (socket-server http-server))
+                   (setf (socket-server http-server) nil)))
+             (error (e)
+               (log2:error "### RUN-HTTP-SERVER Error: ~a" e)))))
     (cond
       (background
        (bordeaux-threads:make-thread #'run))
