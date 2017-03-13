@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-10 00:38:42>
+;;; Last Modified <michael 2017-03-12 16:30:03>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -167,7 +167,7 @@
 (defgeneric handle-request (server connection request))
 
 (defmethod handle-request ((server http-server) (connection t) (request t))
-  (log2:info "+++ ~a - ~a~%"
+  (log2:info "~a - ~a~%"
              (mbedtls:format-ip (mbedtls:peer connection))
              (format-request-info request))
   (condlet
