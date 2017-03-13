@@ -1,9 +1,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-10 00:50:06>
+;;; Last Modified <michael 2017-03-13 22:19:25>
 
 (use-package "POLARCL")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Logging settings
+
+;; (setf (log2:log-level "mbedtls") log2:+trace+)
+;; (setf (log2:log-level "mbedtls:accept") log2:+debug+)
+;; (setf (log2:log-level "mbedtls:mbedtls-net-accept") log2:+info+)
+;; (setf (log2:log-level "mbedtls:create-config") log2:+info+)
+;; (setf (log2:log-level "mbedtls:create-ssl-env") log2:+info+)
+;; (setf (log2:log-level "polarcl") log2:+trace+)
+;; (setf (log2:log-level "polarcl:handler-thread") log2:+info+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; -------
@@ -17,10 +28,12 @@
         :max-handlers 10)
 
 ;;; Start another server on port 4443
+#|
 (server :hostname "localhost"
         :protocol :https
         :port "4443"
         :max-handlers 10)
+|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; -----
