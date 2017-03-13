@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-11 20:29:49>
+;;; Last Modified  <michael 2017-03-13 22:22:38>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -98,7 +98,7 @@
 
 
 (defun stop-server (server)
-  (log2:warning "Stopping server")
+  (log2:info "Stopping server")
   ;; Threads cannot be killed when waiting in ACCEPT or POLL.
   ;; Call mbedtls-net-accept with a timeout and simply allow the threads to expire.
   (setf (server-running server) nil))
@@ -278,7 +278,7 @@
                          (handler-case
                              (write-response connection response)
                            (mbedtls:stream-write-error (e)
-                             (log2:info "~a: HANDLE-CONNECTION: Error ~a" name e)))
+                             (log2:error "~a: HANDLE-CONNECTION: Error ~a" name e)))
                          ;; KeepAlive: wait for another request
                          (when keepalive (go :start))))
                    (error (e)
@@ -289,9 +289,8 @@
                                                               :status-code "400"
                                                               :status-text "Invalid request"))
                        (mbedtls:stream-write-error (e)
-                         (log2:info "~a: HANDLE-CONNECTION: Error ~a" name e))))))
-               :finish))
-        (mbedtls:close-socket connection)))))
+                         (log2:error "~a: HANDLE-CONNECTION: Error ~a" name e))))))
+               :finish))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Reading HTTP requests
@@ -303,7 +302,7 @@
 (defun get-request (server connection request-line)
   (labels ((parse-request-header (line)
              (declare (string line))
-             (log2:info "<<< ~a" line)
+             (log2:trace "<<< ~a" line)
              (let* ((index (position #\space line))
                     (key (intern (string-downcase
                                   (subseq line 0 (1- index)))
@@ -327,7 +326,7 @@
                 :collect (list (subseq pair 0 sep)
                                (when sep (subseq pair (1+ sep))))))
            (create-request (line)
-             (log2:info "<<< ~a" line)
+             (log2:trace "<<< ~a" line)
              (destructuring-bind (&optional (method "INVALID") (query-path "") (http-version "HTTP/1.1"))
                  (cl-utilities:split-sequence #\space line)
                (let* ((url (net.uri:parse-uri query-path))
@@ -433,12 +432,12 @@
 
 (defun write-message-line (stream formatter &rest arguments)
   (let ((string (apply #'format nil formatter arguments)))
-    (log2:info ">>> ~a" string)
+    (log2:trace ">>> ~a" string)
     (mbedtls:write-to-stream stream (string-to-octets string))
     (mbedtls:write-to-stream stream #(13 10))))
 
 (defun write-body (stream body)
-  (log2:info ">>> ~a" (subseq body 0 (min 20 (length body))))
+  (log2:trace ">>> ~a" (subseq body 0 (min 20 (length body))))
   (etypecase body
     (string
       (mbedtls:write-to-stream stream (string-to-octets body)))
