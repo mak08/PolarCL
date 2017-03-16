@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-13 22:19:25>
+;;; Last Modified <michael 2017-03-16 01:44:55>
 
 (use-package "POLARCL")
 
@@ -28,12 +28,12 @@
         :max-handlers 10)
 
 ;;; Start another server on port 4443
-#|
+
 (server :hostname "localhost"
         :protocol :https
         :port "4443"
         :max-handlers 10)
-|#
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; -----
@@ -49,15 +49,15 @@
 ;;; -----------
 ;;; Redirection directive is not yet implemented
 
-;;; Redirect any HTTP request on port 80 to HTTPS port 443.
+;;; Redirect any HTTP request on port 8080 to HTTPS port 4443.
 (redirect
- :from (:protocol "HTTP" :port "80")
- :to (:protocol "HTTPS" :port "443"))
+ :from (:scheme "HTTP" :port "8080")
+ :to (:scheme "HTTPS" :port "4443"))
 
 ;;; Redirect any request that does not specify a file (ie, path ends with a folder)
 ;;; to the file "index.html" at the same path
 (redirect
- :from (:path #'is-folder)
+ :from (:regex ".*/")
  :to (:path "index.html"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

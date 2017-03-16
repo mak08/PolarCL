@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-10 00:52:27>
+;;; Last Modified <michael 2017-03-16 00:46:20>
 
 ;;; ToDo:
 ;;;   Don't load configurations with LOAD.
@@ -20,8 +20,23 @@
 (defmacro user (&key username realm password)
   `(register-user ,username ,realm ,password))
 
-(defmacro redirect (&rest args)
-  nil)
+(defmacro redirect (&key from to)
+  (destructuring-bind (&key (method :get) scheme host port regex path (prefix ""))
+      from
+    (let*
+        ((methods (if (atom method) (list method) method))
+         (protocols (if (atom scheme) (list scheme) scheme))
+         (filter
+          (cond
+            (regex
+             `(create-filter 'regex-filter :method ',methods :protocol ',protocols :host ,host :path (regex:make-regex ,regex)))
+            (path
+             `(create-filter 'exact-filter :method ',methods :protocol ',protocols :host ,host :path ,path))
+            (prefix
+             `(create-filter 'prefix-filter :method ',methods :protocol ',protocols :host ,host :path ,prefix))))
+         (redirector
+          `(create-redirector ,@to)))
+      `(register-redirector :filter ,filter :redirector ,redirector))))
 
 (defmacro handle (&key request handler)
   (destructuring-bind (&key (method :get) path prefix)
