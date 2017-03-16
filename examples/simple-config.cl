@@ -1,9 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-16 01:44:55>
-
-(use-package "POLARCL")
+;;; Last Modified <michael 2017-03-16 23:43:43>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Logging settings
@@ -28,12 +26,10 @@
         :max-handlers 10)
 
 ;;; Start another server on port 4443
-
 (server :hostname "localhost"
         :protocol :https
         :port "4443"
         :max-handlers 10)
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; -----
@@ -50,9 +46,11 @@
 ;;; Redirection directive is not yet implemented
 
 ;;; Redirect any HTTP request on port 8080 to HTTPS port 4443.
+#|
 (redirect
  :from (:scheme "HTTP" :port "8080")
  :to (:scheme "HTTPS" :port "4443"))
+|#
 
 ;;; Redirect any request that does not specify a file (ie, path ends with a folder)
 ;;; to the file "index.html" at the same path
@@ -91,7 +89,7 @@
                                        (declare (ignore response))
                                        (if (string= (http-authenticated-user handler request)
                                                     "admin")
-                                           (progn (stop-server server)
+                                           (progn (stop-all-servers)
                                                   "<!DOCTYPE html><html><body><b><em>Goodby</em></b></body><html>")
                                            "<!DOCTYPE html><html><body><b><em>Not authorized.</em></b></body><html>"))
                     :realm "admin"))

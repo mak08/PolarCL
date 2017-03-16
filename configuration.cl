@@ -1,13 +1,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-16 00:46:20>
+;;; Last Modified <michael 2017-03-16 23:56:22>
 
 ;;; ToDo:
 ;;;   Don't load configurations with LOAD.
 ;;;   Provide a load function that resets the *handlers* list etc.
 
 (in-package polarcl)
+
+
+(defun load-configuration (path)
+  (when (probe-file path)
+    (let ((*package* (find-package "POLARCL")))
+      (stop-all-servers)
+      (sleep 5)
+      (reset)
+      (load path))))
 
 (defmacro server (&rest args &key protocol &allow-other-keys)
   (let ((class (ecase protocol

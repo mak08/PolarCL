@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-13 22:22:38>
+;;; Last Modified  <michael 2017-03-16 23:51:02>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -68,6 +68,16 @@
    (key-file-pw
     :reader server-key-file-pw :initarg :key-file-pw :initform "")))
 
+;;; This is mess.
+;;; - Define variables in a central place, or keep in a structure?
+;;; - Clarify how to write server-specific configurations
+(defun reset ()
+  (setf *handlers* nil)
+  (setf *redirectors* nil)
+  (setf *servers* nil)
+  (setf *users* (make-hash-table :test #'equal))
+  (setf *registered-functions* nil))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; HTTP Server implementation
 
@@ -83,6 +93,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Server run state
+(defvar *servers* nil)
 
 (defvar +server-running-lock+
   (bordeaux-threads:make-lock "server-running"))
@@ -96,9 +107,12 @@
   (bordeaux-threads:with-lock-held (+server-running-lock+)
     (setf (server-running$ server) value)))
 
+(defun stop-all-servers ()
+  (map nil #'stop-server *servers*)
+  (setf *servers* nil))
 
 (defun stop-server (server)
-  (log2:info "Stopping server")
+  (log2:info "Stopping server ~a" server)
   ;; Threads cannot be killed when waiting in ACCEPT or POLL.
   ;; Call mbedtls-net-accept with a timeout and simply allow the threads to expire.
   (setf (server-running server) nil))
@@ -107,6 +121,7 @@
 ;;; Multithreaded HTTP Server
 
 (defun run-http-server (http-server &key (background t))
+  (push http-server *servers*)
   (flet ((run ()
            (handler-case 
                (unwind-protect

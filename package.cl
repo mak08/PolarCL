@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling XMLHttpRequest-style http requests
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-11 00:44:06>
+;;; Last Modified  <michael 2017-03-16 23:44:29>
 
 (defpackage "POLARCL"
   (:use "COMMON-LISP"
@@ -23,12 +23,14 @@
      ;; USOCKET
      "SOCKET-CONNECT"
      "SOCKET-ERROR")
-  (:export "SERVER"
+  (:export "LOAD-CONFIGURATION"
+           "SERVER"
            "USER"
            "REDIRECT"
            "HANDLE"
+           "RUN-HTTP-SERVER"
            "STOP-SERVER"
-           "START-SERVER"
+           "STOP-ALL-SERVERS"
            "HTTP-SERVER"
            "HTTP-GET"
            "HTTP-REQUEST"
@@ -58,7 +60,6 @@
            "PARAMETERS"
            "EXTRA-PARAMETERS"
            "HTTP-VERSION"
-           "SPLIT-STRING"
            "JSON"))
 
 ;;; EOF
