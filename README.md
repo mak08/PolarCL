@@ -1,7 +1,7 @@
 # PolarSeal
 A web server based on mbedTLS
 
-## Features
+## Desciption
 PolarSeal is a web server based on [mbedTLS](https://www.mbed.com/en/technologies/security/mbed-tls/) (formerly known as PolarSSL). It is still work in progress.
 PolarSeal currently supports
 * Secure (TLS) and plain socket connections
@@ -22,3 +22,15 @@ PolarSeal currently supports
 Furthermore, PolarSeal supports server-side programming in Common Lisp 
 * Registering handlers for serving static and dynamic content
 * Easy registration of Lisp functions to be called from XHR GET requests, for example.
+
+## Depends on
+* Quicklisp libraries
+   * bordeaux-threads
+   * puri
+   * cl-base64
+   * cffi
+   * local-time
+* Github projects
+   * cl-mbedtls
+   * regex
+   * zlib
