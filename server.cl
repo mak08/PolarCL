@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-16 23:51:02>
+;;; Last Modified  <michael 2017-03-20 00:02:09>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -254,10 +254,10 @@
              (handler-case
                  (mbedtls:get-line connection :timeout (mbedtls:keepalive connection))
                (mbedtls:stream-empty-read ()
-                 (log2:warning "~a: Client sent zero bytes, aborting request" name)
+                 (log2:debug "~a: Client sent zero bytes, aborting request" name)
                  (return-from get-request-line nil))
                (mbedtls:stream-read-error ()
-                 (log2:warning "~a: Client inactiv, aborting request" name)
+                 (log2:debug "~a: Client inactiv, aborting request" name)
                  (return-from get-request-line nil))))
            (keepalive-p (request start-time)
              (let ((now (get-internal-real-time)))
