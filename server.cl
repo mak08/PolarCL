@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-21 22:12:32>
+;;; Last Modified  <michael 2017-03-21 23:31:04>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -267,11 +267,11 @@
          (let ((k -1))
            (tagbody
              :start
-             (log2:debug "HANDLE-CONNECTION: Waiting for request ~d" (incf k))
+             (log2:debug "Waiting for request ~d" (incf k))
              (let ((start-time (get-internal-real-time))
                    (request-line (get-request-line)))
                (when (null request-line) (go :finish))
-
+               (log2:info "~a ~a ~a" (server-port http-server) (mbedtls:peer connection) request-line)
                (handler-case 
                    (let* ((server (socket-server http-server))
                           (request (get-request server connection request-line))
@@ -290,18 +290,18 @@
                        (handler-case
                            (write-response connection response)
                          (mbedtls:stream-write-error (e)
-                           (log2:error "HANDLE-CONNECTION: Error ~a" e)))
+                           (log2:error "Caught error: ~a" e)))
                        ;; KeepAlive: wait for another request
                        (when keepalive (go :start))))
                  (error (e)
-                   (log2:warning "HANDLE-CONNECTION: Error: ~a" e)
+                   (log2:warning "Caught error: ~a" e)
                    (handler-case
                        (write-response connection
                                        (make-error-response :body (format () "~a" e)
                                                             :status-code "400"
                                                             :status-text "Invalid request"))
                      (mbedtls:stream-write-error (e)
-                       (log2:error "HANDLE-CONNECTION: Error ~a" e))))))
+                       (log2:error "Caught error: ~a" e))))))
              :finish)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
