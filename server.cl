@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-20 00:02:09>
+;;; Last Modified  <michael 2017-03-21 22:12:32>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -206,20 +206,19 @@
          (threads
           (loop
              :for k :below (server-max-handlers http-server)
-             :for name = (format () "handler-~d-~d" k (server-port http-server))
+             :for name = (format () "handler-~d" k)
              :collect (bordeaux-threads:make-thread
-                       (lambda () (handler-thread name http-server))
+                       (lambda () (handler-thread http-server))
                        :name name))))
     ;; Killing the threads does not work reliably,
     ;; therefore don't join-threads here but just wait until *run* becomes false
-    ;; TODO: There is still a bug leaving one HTTP server thread running sometimes.
     (do ()
         ((not (server-running http-server))
          t)
       (sleep 1))))
 
-(defun handler-thread (name http-server)
-  (log2:debug "~a: Accept loop started" name)
+(defun handler-thread (http-server)
+  (log2:debug "Accept loop started")
   (do ((requests 0)
        (server (socket-server http-server)))
       ((not (server-running http-server))
@@ -227,85 +226,83 @@
        t)
     (handler-case
         (mbedtls:with-server-connection ((conn server))
-          (log2:debug "~a: Accepting a new connection" name)
+          (log2:debug "Accepting a new connection")
           (when (and conn (server-running http-server))
             (incf requests)
-            (log2:debug "~a: Accepted connection ~d" name requests)
-            (handle-connection http-server conn name)))
+            (log2:debug "Accepted connection ~d" requests)
+            (handle-connection http-server conn)))
       (error (e)
-        (log2:error "### ~a: Error: ~a" name e))))
-  (log2:debug "~a: Accept loop finished, thread exiting" name))
+        (log2:error "Caught error: ~a" e))))
+  (log2:debug "Accept loop finished, thread exiting"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; HANDLE-CONNECTION
 
-(defgeneric handle-connection (server connection &optional handler-name))
+(defgeneric handle-connection (server connection))
 
 (defmethod handle-connection ((http-server http-server)
-                              (connection mbedtls:socket-stream)
-                              &optional (name (bordeaux-threads:thread-name (bordeaux-threads:current-thread))))
+                              (connection mbedtls:socket-stream))
   ;; Timeout handling:
   ;; - mbedtls:*keepalive-timeout* is bound only while attempting to read the next Request-Line.
   ;; - The shorter (mbedtls:timeout mbedtls:socket-stream) is used while reading the remaining request parts.
   ;; See mbedtls:refresh-buffer.
-  (let ((server (socket-server http-server))
-        (keepalive-total-time (server-max-keepalive-total-time http-server)))
-    (flet ((get-request-line ()
-             (handler-case
-                 (mbedtls:get-line connection :timeout (mbedtls:keepalive connection))
-               (mbedtls:stream-empty-read ()
-                 (log2:debug "~a: Client sent zero bytes, aborting request" name)
-                 (return-from get-request-line nil))
-               (mbedtls:stream-read-error ()
-                 (log2:debug "~a: Client inactiv, aborting request" name)
-                 (return-from get-request-line nil))))
-           (keepalive-p (request start-time)
-             (let ((now (get-internal-real-time)))
-               (and (string-equal (http-header request :|connection|)
-                                  "keep-alive")
-                    (< (* (/ (- now start-time)
-                             internal-time-units-per-second)
-                          1000)
-                       keepalive-total-time)))))
-      (unwind-protect
-           (let ((k -1))
-             (tagbody
-               :start
-               (log2:debug "~a: HANDLE-CONNECTION: Waiting for request ~d" name (incf k))
-               (let ((start-time (get-internal-real-time))
-                     (request-line (get-request-line)))
-                 (when (null request-line) (go :finish))
+  (flet ((get-request-line ()
+           (handler-case
+               (mbedtls:get-line connection :timeout (mbedtls:keepalive connection))
+             (mbedtls:stream-empty-read ()
+               (log2:debug "Client sent zero bytes, aborting request")
+               (return-from get-request-line nil))
+             (mbedtls:stream-read-error ()
+               (log2:debug "Client inactiv, aborting request")
+               (return-from get-request-line nil))))
+         (keepalive-p (request start-time)
+           (let ((now (get-internal-real-time)))
+             (and (string-equal (http-header request :|connection|)
+                                "keep-alive")
+                  (< (* (/ (- now start-time)
+                           internal-time-units-per-second)
+                        1000)
+                     (server-max-keepalive-total-time http-server))))))
+    (unwind-protect
+         (let ((k -1))
+           (tagbody
+             :start
+             (log2:debug "HANDLE-CONNECTION: Waiting for request ~d" (incf k))
+             (let ((start-time (get-internal-real-time))
+                   (request-line (get-request-line)))
+               (when (null request-line) (go :finish))
 
-                 (handler-case 
-                     (let* ((request (get-request server connection request-line))
-                            (response
-                             ;; Request Handling
-                             (handle-request http-server connection request)))
-                       (log2:debug "Keepalive: ~a from ~a" (http-header response :|Connection|) response)
-                       (let ((keepalive
-                              ;; KeepAlive only if the response says keep-alive.
-                              (and (string= (http-header response :|Connection|) "keep-alive")
-                                   (keepalive-p request start-time))))
-                         ;; Response post-processing: KeepAlive?
-                         (setf (http-header response :|Connection|)
-                               (if keepalive "keep-alive" "close"))
-                         (log2:debug "~a: KeepAlive ~a: request ~a" name connection k)
-                         (handler-case
-                             (write-response connection response)
-                           (mbedtls:stream-write-error (e)
-                             (log2:error "~a: HANDLE-CONNECTION: Error ~a" name e)))
-                         ;; KeepAlive: wait for another request
-                         (when keepalive (go :start))))
-                   (error (e)
-                     (log2:warning "~a: HANDLE-CONNECTION: Error: ~a" name e)
-                     (handler-case
-                         (write-response connection
-                                         (make-error-response :body (format () "~a" e)
-                                                              :status-code "400"
-                                                              :status-text "Invalid request"))
-                       (mbedtls:stream-write-error (e)
-                         (log2:error "~a: HANDLE-CONNECTION: Error ~a" name e))))))
-               :finish))))))
+               (handler-case 
+                   (let* ((server (socket-server http-server))
+                          (request (get-request server connection request-line))
+                          (response
+                           ;; Request Handling
+                           (handle-request http-server connection request)))
+                     (log2:debug "Keepalive: ~a from ~a" (http-header response :|Connection|) response)
+                     (let ((keepalive
+                            ;; KeepAlive only if the response says keep-alive.
+                            (and (string= (http-header response :|Connection|) "keep-alive")
+                                 (keepalive-p request start-time))))
+                       ;; Response post-processing: KeepAlive?
+                       (setf (http-header response :|Connection|)
+                             (if keepalive "keep-alive" "close"))
+                       (log2:debug "KeepAlive ~a: request ~a" connection k)
+                       (handler-case
+                           (write-response connection response)
+                         (mbedtls:stream-write-error (e)
+                           (log2:error "HANDLE-CONNECTION: Error ~a" e)))
+                       ;; KeepAlive: wait for another request
+                       (when keepalive (go :start))))
+                 (error (e)
+                   (log2:warning "HANDLE-CONNECTION: Error: ~a" e)
+                   (handler-case
+                       (write-response connection
+                                       (make-error-response :body (format () "~a" e)
+                                                            :status-code "400"
+                                                            :status-text "Invalid request"))
+                     (mbedtls:stream-write-error (e)
+                       (log2:error "HANDLE-CONNECTION: Error ~a" e))))))
+             :finish)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Reading HTTP requests
