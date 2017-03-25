@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-21 23:31:04>
+;;; Last Modified  <michael 2017-03-26 00:10:53>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -11,6 +11,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo:
+;;; - check why clients hang until we close the connection after an error response.
+;;;   Does not seem to happen after an OK response.
 ;;; - definition/use of supported request methods (eg, in get-request)
 ;;; - Notify failed TLS handshake
 ;;;   => Need to refactor ACCEPT? Store the plain socket somewhere?
@@ -36,7 +38,7 @@
    (default-charset
     :reader server-default-charset :initarg :default-charset :initform "UTF-8")
    (keepalive
-    :reader server-keepalive :initarg :keepalive :initform 5000
+    :reader server-keepalive :initarg :keepalive :initform 10000
     :documentation "How long a connection waits for the next request")
    (max-keepalive-total-time
     :reader server-max-keepalive-total-time :initarg  :max-keepalive-total-time :initform 10000
@@ -250,10 +252,10 @@
            (handler-case
                (mbedtls:get-line connection :timeout (mbedtls:keepalive connection))
              (mbedtls:stream-empty-read ()
-               (log2:debug "Client sent zero bytes, aborting request")
+               (log2:info "~a sent zero bytes, aborting request" (mbedtls:peer connection))
                (return-from get-request-line nil))
              (mbedtls:stream-read-error ()
-               (log2:debug "Client inactiv, aborting request")
+               (log2:info "~a inactive, aborting request" (mbedtls:peer connection))
                (return-from get-request-line nil))))
          (keepalive-p (request start-time)
            (let ((now (get-internal-real-time)))
@@ -271,7 +273,6 @@
              (let ((start-time (get-internal-real-time))
                    (request-line (get-request-line)))
                (when (null request-line) (go :finish))
-               (log2:info "~a ~a ~a" (server-port http-server) (mbedtls:peer connection) request-line)
                (handler-case 
                    (let* ((server (socket-server http-server))
                           (request (get-request server connection request-line))
