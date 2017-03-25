@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-01 21:02:25>
+;;; Last Modified <michael 2017-03-26 00:09:43>
 
 (in-package "POLARCL")
 
@@ -129,7 +129,7 @@
        (rplacd (assoc name (cdr cookies))
                (list value))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Predefined / template responses
 
 (defun make-ok-response (request)
@@ -139,7 +139,7 @@
                       :headers (list (cons :|Access-Control-Allow-Origin|  "*")
                                      (cons :|Content-Type| "text/html")
                                      (cons :|Connection| "keep-alive")
-                                     (cons :|Server| "PolarSeal"))))
+                                     (cons :|Server| "PolarCL"))))
 
 (defun make-redirect-response (request location)
   (declare (ignorable request))
@@ -147,19 +147,29 @@
                       :status-text "Moved Permanently"
                       :headers (list
                                 (cons :|Location|  location)
-                                (cons :|Connection| "close"))))
+                                (cons :|Connection| "close")
+                                (cons :|Server| "PolarCL"))))
 
 (defun make-authenticate-response (handler request)
   (declare (ignorable request))
   (make-http-response :status-code "401"
                       :status-text "Not Authorized"
                       :headers (list (cons :|WWW-Authenticate| (format () "Basic realm=~a" (handler-realm handler)))
-                                     (cons :|Connection| "keep-alive"))))
+                                     (cons :|Connection| "close")
+                                     (cons :|Server| "PolarCL"))))
+
+(defun make-notfound-response (handler request)
+  (declare (ignorable request))
+  (make-http-response :status-code "404"
+                      :status-text "Not Found"
+                      :headers (list (cons :|Connection| "close")
+                                     (cons :|Server| "PolarCL"))))
 
 (defun make-error-response (&key
-                              (status-code 500)
+                              (status-code "500")
                               (status-text "An error occurred")
-                              (headers (list (cons :|Connection| "keep-alive")))
+                              (headers (list (cons :|Connection| "close")
+                                             (cons :|Server| "PolarCL")))
                               (body "An error occurred. We're sorry."))
   (make-http-response :status-code status-code
                       :status-text status-text
@@ -171,12 +181,18 @@
 
 (defun http-transfer-encoding (response)
   (http-header response :|transfer-encoding|))
+
 (defun http-content-encoding (response)
   (http-header response :|content-encoding|))
+
 (defun http-content-length (response)
   (http-header response :|content-length|))
+
 (defun http-content-type (response)
   (http-header response :|content-type|))
+
+(defparameter *default-charset* "utf-8")
+
 (defun http-charset (request)
   (let* ((content-type (http-content-type request))
          (encoding (if (null content-type)

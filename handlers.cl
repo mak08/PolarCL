@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-21 22:51:48>
+;;; Last Modified <michael 2017-03-26 00:04:01>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -202,9 +202,9 @@
          (let ((response (make-ok-response request)))
            (handle-response server (dispatcher-filter dispatcher) handler request response)
            response)))))
-   ;; 3 - No handler found.
+   ;; 3 - No handler found. Reply with "Bad Request".
    (t
-    (make-error-response :status-code "400" :status-code "Not found"))))
+    (make-http-response :status-code "400" :status-text "Bad Request"))))
 
 
 (defgeneric handle-response (server filter handler request response))
