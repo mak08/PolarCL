@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-26 00:04:01>
+;;; Last Modified <michael 2017-03-27 00:04:41>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -167,7 +167,7 @@
 (defgeneric handle-request (server connection request))
 
 (defmethod handle-request ((server http-server) (connection t) (request t))
-  (log2:info "~a ~a ~a~%"
+  (log2:debug "~a ~a ~a~%"
              (server-port server)
              (mbedtls:format-ip (mbedtls:peer connection))
              (format-request-info request))
@@ -184,8 +184,8 @@
                         request-host))
               (port (or (redirector-port redirector)
                         request-port))
-              (path (or (redirector-path redirector)
-                        (http-path request))))
+              (path (merge-paths (redirector-path redirector)
+                                 (http-path request))))
           (make-redirect-response request
                                   (format () "~a://~a:~a~a" scheme host port path))))))
    ;; 2 - Find handler
@@ -206,6 +206,22 @@
    (t
     (make-http-response :status-code "400" :status-text "Bad Request"))))
 
+(defun merge-paths (redirect-path request-path)
+  (cond
+    ((null redirect-path)
+     (error "Redirector does not specify a location"))
+    ((absolute-path-p redirect-path)
+     redirect-path)
+    (t
+     (case (aref request-path (1- (length request-path)))
+       (#\/
+        (concatenate 'string request-path redirect-path))
+       (otherwise
+        (concatenate 'string request-path "/" redirect-path))))))
+
+(defun absolute-path-p (path)
+  (and (>= (length path) 1)
+       (char= (aref path 0) #\/)))
 
 (defgeneric handle-response (server filter handler request response))
 
