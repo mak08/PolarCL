@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-26 00:10:53>
+;;; Last Modified  <michael 2017-03-26 22:47:29>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -289,7 +289,14 @@
                              (if keepalive "keep-alive" "close"))
                        (log2:debug "KeepAlive ~a: request ~a" connection k)
                        (handler-case
-                           (write-response connection response)
+                           (progn
+                             (write-response connection response)
+                             (log2:info "~a ~a ~a ~a ~a"
+                                        (server-port http-server)
+                                        (status-code response)
+                                        (if keepalive "A" "C")
+                                        (mbedtls:format-ip (mbedtls:peer connection))
+                                        (format-request-info request)))
                          (mbedtls:stream-write-error (e)
                            (log2:error "Caught error: ~a" e)))
                        ;; KeepAlive: wait for another request
