@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-16 23:56:22>
+;;; Last Modified <michael 2017-03-26 22:59:01>
 
 ;;; ToDo:
 ;;;   Don't load configurations with LOAD.
@@ -34,7 +34,7 @@
       from
     (let*
         ((methods (if (atom method) (list method) method))
-         (protocols (if (atom scheme) (list scheme) scheme))
+         (protocols (if (listp scheme) scheme (list scheme)))
          (filter
           (cond
             (regex
