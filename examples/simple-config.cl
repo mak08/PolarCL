@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-21 22:05:47>
+;;; Last Modified <michael 2017-03-27 00:11:06>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Logging settings
@@ -14,6 +14,7 @@
 (setf (log2:log-level "mbedtls:mbedtls-error-text") log2:+info+)
 
 (setf (log2:log-level "polarcl") log2:+info+)
+(setf (log2:log-level "polarcl:server-loop-ondemand") log2:+info+)
 (setf (log2:log-level "polarcl:handler-thread") log2:+info+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
