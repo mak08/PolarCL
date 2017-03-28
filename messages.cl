@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-26 00:09:43>
+;;; Last Modified <michael 2017-03-28 22:35:47>
 
 (in-package "POLARCL")
 
@@ -142,6 +142,15 @@
                                      (cons :|Server| "PolarCL"))))
 
 (defun make-redirect-response (request location)
+  (declare (ignorable request))
+  (make-http-response :status-code "302"
+                      :status-text "Found"
+                      :headers (list
+                                (cons :|Location|  location)
+                                (cons :|Connection| "close")
+                                (cons :|Server| "PolarCL"))))
+
+(defun make-permanent-redirect-response (request location)
   (declare (ignorable request))
   (make-http-response :status-code "301"
                       :status-text "Moved Permanently"
