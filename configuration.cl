@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-26 22:59:01>
+;;; Last Modified <michael 2017-03-27 01:12:08>
 
 ;;; ToDo:
 ;;;   Don't load configurations with LOAD.
@@ -42,13 +42,15 @@
             (path
              `(create-filter 'exact-filter :method ',methods :protocol ',protocols :host ,host :path ,path))
             (prefix
-             `(create-filter 'prefix-filter :method ',methods :protocol ',protocols :host ,host :path ,prefix))))
+             `(create-filter 'prefix-filter :method ',methods :protocol ',protocols :host ,host :path ,prefix))
+            (t
+             `(create-filter 'exact-filter :method ',methods :protocol ',protocols :host ,host :path ,prefix))))
          (redirector
           `(create-redirector ,@to)))
       `(register-redirector :filter ,filter :redirector ,redirector))))
 
 (defmacro handle (&key request handler)
-  (destructuring-bind (&key (method :get) path prefix)
+  (destructuring-bind (&key host (method :get) path prefix)
       request
     (destructuring-bind (&key static dynamic realm (authentication :basic))
         handler
@@ -57,15 +59,17 @@
            (filter
              (cond
                (path
-                `(create-filter 'exact-filter :method ',methods :path ,path))
+                `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))
                (prefix
-                `(create-filter 'prefix-filter :method ',methods :path ,prefix))))
-            (handler
-             (cond
-               (static
-                `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :realm ,realm))
-               (dynamic
-                `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :realm ,realm)))))
+                `(create-filter 'prefix-filter :host ,host :method ',methods :path ,prefix))
+               (t
+                `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))))
+           (handler
+            (cond
+              (static
+               `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :realm ,realm))
+              (dynamic
+               `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :realm ,realm)))))
         `(register-handler :filter ,filter :handler ,handler)))))
 
 ;;; EOF
