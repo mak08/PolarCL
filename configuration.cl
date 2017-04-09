@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-27 01:12:08>
+;;; Last Modified <michael 2017-04-09 00:41:02>
 
 ;;; ToDo:
 ;;;   Don't load configurations with LOAD.
@@ -50,27 +50,35 @@
       `(register-redirector :filter ,filter :redirector ,redirector))))
 
 (defmacro handle (&key request handler)
+  (let ((handler
+         (cond
+           ((atom handler)
+            (list handler t))
+           (t
+            handler))))
   (destructuring-bind (&key host (method :get) path prefix)
       request
-    (destructuring-bind (&key static dynamic realm (authentication :basic))
+    (destructuring-bind (&key static dynamic query-function realm (authentication :basic))
         handler
       (let*
           ((methods (if (atom method) (list method) method))
            (filter
-             (cond
-               (path
-                `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))
-               (prefix
-                `(create-filter 'prefix-filter :host ,host :method ',methods :path ,prefix))
-               (t
-                `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))))
+            (cond
+              (path
+               `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))
+              (prefix
+               `(create-filter 'prefix-filter :host ,host :method ',methods :path ,prefix))
+              (t
+               `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))))
            (handler
             (cond
               (static
                `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :realm ,realm))
               (dynamic
-               `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :realm ,realm)))))
-        `(register-handler :filter ,filter :handler ,handler)))))
+               `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :realm ,realm))
+              (query-function
+               `(create-handler 'qfunc-handler :authentication ,authentication :realm ,realm)))))
+        `(register-handler :filter ,filter :handler ,handler))))))
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-02-25 15:40:22>
+;;; Last Modified <michael 2017-04-09 00:48:42>
 
 (in-package "POLARCL")
 
@@ -33,10 +33,8 @@
 
 
 (defmacro with-func-from-path ((fsym request) &body body)
-  `(destructuring-bind (fname functions content &rest more)
+  `(destructuring-bind (fname &rest namespace)
        (reverse (path ,request))
-     (when more
-       (error "Path too long"))
      (destructuring-bind (&optional package name)
          (cl-utilities:split-sequence #\: fname)
        (log2:info "Searching function ~a:~a" (string-upcase package) name )

@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-27 00:11:06>
+;;; Last Modified <michael 2017-03-30 21:18:40>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Logging settings
@@ -13,7 +13,7 @@
 (setf (log2:log-level "mbedtls:create-ssl-env") log2:+info+)
 (setf (log2:log-level "mbedtls:mbedtls-error-text") log2:+info+)
 
-(setf (log2:log-level "polarcl") log2:+info+)
+(setf (log2:log-level "polarcl") log2:+trace+)
 (setf (log2:log-level "polarcl:server-loop-ondemand") log2:+info+)
 (setf (log2:log-level "polarcl:handler-thread") log2:+info+)
 
@@ -23,17 +23,17 @@
 ;;; -------
 
 ;;; Start one server on port 8080 
-(server :hostname "localhost"
+(server :hostname "aguas-9"
         :protocol :http
         :mt-method :ondemand
-        :port "8080"
+        :port "80"
         :max-handlers 10)
 
 ;;; Start another server on port 4443
 
 (server :hostname "localhost"
         :protocol :https
-        :port "4443"
+        :port "443"
         :max-handlers 10)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -73,9 +73,15 @@
 ;;; This :static handler serves just one file, index.html.
 ;;; It uses the no authentication (default is :basic).
 
+
 (handle
  :request (:path "/index.html")
  :handler (:static "/var/www/html/index.html" :authentication nil))
+
+(handle
+ :request (:host '("127.0.1.1"))
+ :handler (:dynamic (lambda (s h req res)
+                      (setf (status-code res) "666"))))
 
 ;;; A :static handler, serving any files below the path :prefix /content/pages.
 ;;; The real path is found by replacing the path prefix with the static root path.
