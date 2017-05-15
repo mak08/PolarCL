@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-26 22:47:29>
+;;; Last Modified  <michael 2017-05-15 23:49:52>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -298,18 +298,18 @@
                                         (mbedtls:format-ip (mbedtls:peer connection))
                                         (format-request-info request)))
                          (mbedtls:stream-write-error (e)
-                           (log2:error "Caught error: ~a" e)))
+                           (log2:error "~a Write failed: ~a" (mbedtls:peer connection) e)))
                        ;; KeepAlive: wait for another request
                        (when keepalive (go :start))))
                  (error (e)
-                   (log2:warning "Caught error: ~a" e)
+                   (log2:warning "~a Caught error: ~a" (mbedtls:peer connection) e)
                    (handler-case
                        (write-response connection
                                        (make-error-response :body (format () "~a" e)
                                                             :status-code "400"
                                                             :status-text "Invalid request"))
                      (mbedtls:stream-write-error (e)
-                       (log2:error "Caught error: ~a" e))))))
+                       (log2:error "~a Write failed while sending error response: ~a" (mbedtls:peer connection) e))))))
              :finish)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
