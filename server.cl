@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-05-15 23:49:52>
+;;; Last Modified  <michael 2017-07-30 21:28:06>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -471,7 +471,7 @@
      :for (header . value) :in headers
      :do (case header
            (:|Set-Cookie|
-             (write-message-line stream "~a: ~{~{~a=~a~}~^; ~}" header value))
+             (write-message-line stream "~a: ~{~{~a=~a~}~^, ~}" header value))
            (:|Cookie|
              (error "Use verb Set-Cookie instead of Cookie"))
            (t

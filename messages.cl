@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-28 22:35:47>
+;;; Last Modified <michael 2017-07-30 14:44:51>
 
 (in-package "POLARCL")
 
@@ -109,9 +109,8 @@
 
 (defgeneric get-cookie (r name))
 (defmethod  get-cookie ((r http-request) name)
-  (let ((cookies (cdr (assoc :|Cookie| (headers r)))))
-    (or (getf (extra-parameters r) name)
-        (cadr (assoc name cookies)))))
+  (let ((cookies (cdr (assoc :|cookie| (headers r)))))
+    cookies))
 
 (defgeneric set-cookie (r name value))
 (defmethod set-cookie ((r http-request) name value)

@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-03-30 21:18:40>
+;;; Last Modified <michael 2017-05-15 23:51:36>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Logging settings
@@ -26,14 +26,14 @@
 (server :hostname "aguas-9"
         :protocol :http
         :mt-method :ondemand
-        :port "80"
+        :port "8080"
         :max-handlers 10)
 
 ;;; Start another server on port 4443
 
-(server :hostname "localhost"
+(server :hostname "aguas-9"
         :protocol :https
-        :port "443"
+        :port "4443"
         :max-handlers 10)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
