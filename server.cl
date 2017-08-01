@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-07-30 21:28:06>
+;;; Last Modified  <michael 2017-08-02 00:20:05>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -319,25 +319,28 @@
 ;;; - construct request
 ;;; - retrieve body using header info
 
+(defun parse-request-header (line)
+  (declare (string line))
+  (log2:trace "<<< ~a" line)
+  (let* ((index (position #\colon line))
+         (key (intern (string-downcase
+                       (subseq line 0 index))
+                      :keyword))
+         (value (subseq line (1+ index))))
+    (make-instance 'http-header
+                   :name key
+                   :value (case key
+                            (:|cookie|
+                              (loop
+                                 :for name-value-pair :in (cl-utilities:split-sequence #\; value)
+                                 :for (name value) = (cl-utilities:split-sequence #\= name-value-pair)
+                                 :collect (make-cookie :name (intern (string-left-trim " " (the simple-string name)) :keyword)
+                                                       :value value)))
+                            (t
+                             value)))))
+
 (defun get-request (server connection request-line)
-  (labels ((parse-request-header (line)
-             (declare (string line))
-             (log2:trace "<<< ~a" line)
-             (let* ((index (position #\space line))
-                    (key (intern (string-downcase
-                                  (subseq line 0 (1- index)))
-                                 :keyword)) ; strip trailing double-colon
-                    (value (subseq line (1+ index))))
-               (cons key
-                     (case key
-                       (:|Cookie|
-                         (loop
-                            :for name-value-pair :in (cl-utilities:split-sequence #\; value)
-                            :for (name value) = (cl-utilities:split-sequence #\= name-value-pair)
-                            :collect (list (intern (string-left-trim " " (the simple-string name)) :keyword)
-                                           value)))
-                       (t
-                        value)))))
+  (labels (
            (parse-url-query (string)
              ;; Fixme: handle escaped chars =,& ?
              (loop
@@ -468,14 +471,13 @@
 
 (defun write-headers (headers stream)
   (loop
-     :for (header . value) :in headers
-     :do (case header
-           (:|Set-Cookie|
-             (write-message-line stream "~a: ~{~{~a=~a~}~^, ~}" header value))
+     :for header :in headers
+     :do (case (field-name header)
            (:|Cookie|
-             (error "Use verb Set-Cookie instead of Cookie"))
+             (error "Use Set-Cookie instead of Cookie in HTTP response"))
            (t
-             (write-message-line stream "~a: ~a" header value)))))
+            ;; This relies on print-object to print cookies
+            (write-message-line stream "~a: ~a" (field-name header) (field-value header))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Aux functions

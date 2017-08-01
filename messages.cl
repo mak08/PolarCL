@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-07-30 14:44:51>
+;;; Last Modified <michael 2017-08-01 23:48:48>
 
 (in-package "POLARCL")
 
@@ -13,17 +13,23 @@
    (port :accessor http-port :initarg :port)
    (headers :accessor headers :initarg :headers :initform ())
    (body :accessor body :initarg :body :initform "")))
-  
+
+(defclass http-header ()
+  ((field-name :accessor field-name :initarg :name) 
+   (field-value :accessor field-value :initarg :value)))
+(defmethod print-object ((object http-header) stream)
+  (format stream "<HEADER ~a: ~a>"
+          (field-name object)
+          (field-value object)))
+
 (defclass http-response (http-basic)
   ((status-code :accessor status-code :initarg :status-code)
    (status-text :accessor status-text :initarg :status-text)))
-
 (defmethod print-object ((object http-response) stream)
   (format stream "<RESPONSE ~a ~a ~a>"
           (status-code object)
           (status-text object)
           (ignore-errors (subseq (body object) 0 10))))
-
           
 (defun make-http-response (&rest args &key host port headers body status-code status-text)
   (declare (ignorable host port headers body status-code status-text))
@@ -36,6 +42,13 @@
    (parameters :accessor parameters :initarg :parameters)
    (fragment :accessor fragment :initarg :fragment)
    (http-version :accessor http-version :initarg :http-version :initform "HTTP/1.1")))
+
+(defmethod print-object ((object http-request) stream)
+  (format stream "<REQUEST ~a ~a ~a ~a>"
+          (http-method object)
+          (path object)
+          (headers object)
+          (ignore-errors (subseq (body object) 0 (min (length (body object)) 20)))))
 
 (defun path-string (request)
   (format () "/~{~a~^/~}" (path request)))
@@ -87,12 +100,15 @@
 
 (defun http-header (r name)
   ;; Don't modify the header here
-  (cdr (assoc name (headers r))))
+  (let ((header (find name (headers r) :key #'field-name)))
+    (when header
+      (field-value header))))
 
 (defun set-http-header (r name value)
-  (if (null (assoc name (headers r)))
-    (push (cons name value) (headers r))
-    (setf (cdr (assoc name (headers r))) value)))
+  (let ((header (find name (headers r) :key #'field-name)))
+    (if header
+      (setf (field-value header) value)
+      (push (make-instance 'http-header :name name :value value) (headers r)))))
 
 (defsetf http-header set-http-header)
 
@@ -106,27 +122,27 @@
 
 (defsetf http-body set-http-body)
 
+(defstruct cookie name value (options ""))
+(defmethod print-object ((object cookie) stream)
+  (format stream "~a=~a;~a"
+          (cookie-name object)
+          (cookie-value object)
+          (cookie-options object)))
 
 (defgeneric get-cookie (r name))
 (defmethod  get-cookie ((r http-request) name)
-  (let ((cookies (cdr (assoc :|cookie| (headers r)))))
-    cookies))
+  (let ((cookies (find  :|cookie| (headers r) :key #'field-name)))
+    (when cookies
+      (find name (field-value cookies) :key #'cookie-name :test #'string=))))
 
 (defgeneric set-cookie (r name value))
 (defmethod set-cookie ((r http-request) name value)
-  (set-cookie% r name value :|Cookie|))
+  (error "NYI"))
 (defmethod set-cookie ((r http-response) name value)
-  (set-cookie% r name value :|Set-Cookie|))
-(defun set-cookie% (r name value ckey)
-  (when (null (assoc ckey (headers r)))
-    (push (cons ckey nil) (headers r)))
-  (let ((cookies (assoc ckey (headers r))))
-    (cond
-      ((null (assoc name (cdr cookies)))
-       (push (list name value) (cdr cookies)))
-      (t
-       (rplacd (assoc name (cdr cookies))
-               (list value))))))
+  (let ((new-header (make-instance 'http-header
+                                   :name :|Set-Cookie|
+                                   :value (make-cookie :name name :value value))))
+    (push new-header (headers r))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Predefined / template responses
@@ -135,49 +151,49 @@
   (declare (ignorable request))
   (make-http-response :status-code "200"
                       :status-text "OK"
-                      :headers (list (cons :|Access-Control-Allow-Origin|  "*")
-                                     (cons :|Content-Type| "text/html")
-                                     (cons :|Connection| "keep-alive")
-                                     (cons :|Server| "PolarCL"))))
+                      :headers (list (make-instance 'http-header :name :|Access-Control-Allow-Origin| :value "*")
+                                     (make-instance 'http-header :name :|Content-Type| :value "text/html")
+                                     (make-instance 'http-header :name :|Connection| :value "keep-alive")
+                                     (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-redirect-response (request location)
   (declare (ignorable request))
   (make-http-response :status-code "302"
                       :status-text "Found"
                       :headers (list
-                                (cons :|Location|  location)
-                                (cons :|Connection| "close")
-                                (cons :|Server| "PolarCL"))))
+                                (make-instance 'http-header :name :|Location| :value location)
+                                (make-instance 'http-header :name :|Connection| :value "close")
+                                (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-permanent-redirect-response (request location)
   (declare (ignorable request))
   (make-http-response :status-code "301"
                       :status-text "Moved Permanently"
                       :headers (list
-                                (cons :|Location|  location)
-                                (cons :|Connection| "close")
-                                (cons :|Server| "PolarCL"))))
+                                (make-instance 'http-header :name :|Location| :value  location)
+                                (make-instance 'http-header :name :|Connection| :value "close")
+                                (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-authenticate-response (handler request)
   (declare (ignorable request))
   (make-http-response :status-code "401"
                       :status-text "Not Authorized"
-                      :headers (list (cons :|WWW-Authenticate| (format () "Basic realm=~a" (handler-realm handler)))
-                                     (cons :|Connection| "close")
-                                     (cons :|Server| "PolarCL"))))
+                      :headers (list (make-instance 'http-header :name :|WWW-Authenticate| :value (format () "Basic realm=~a" (handler-realm handler)))
+                                     (make-instance 'http-header :name :|Connection| :value "close")
+                                     (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-notfound-response (handler request)
   (declare (ignorable request))
   (make-http-response :status-code "404"
                       :status-text "Not Found"
-                      :headers (list (cons :|Connection| "close")
-                                     (cons :|Server| "PolarCL"))))
+                      :headers (list (make-instance 'http-header :name :|Connection| :value "close")
+                                     (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-error-response (&key
                               (status-code "500")
                               (status-text "An error occurred")
-                              (headers (list (cons :|Connection| "close")
-                                             (cons :|Server| "PolarCL")))
+                              (headers (list (make-instance 'http-header :name :|Connection| :value "close")
+                                             (make-instance 'http-header :name :|Server| :value "PolarCL")))
                               (body "An error occurred. We're sorry."))
   (make-http-response :status-code status-code
                       :status-text status-text
