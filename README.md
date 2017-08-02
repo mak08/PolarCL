@@ -1,13 +1,14 @@
 # PolarCL
 A web server based on mbedTLS
 
-## Desciption
+## Description
 PolarCL is a web server based on [mbedTLS](https://www.mbed.com/en/technologies/security/mbed-tls/) (formerly known as PolarSSL). It is still work in progress.
 PolarCL currently supports
 * Secure (TLS) and plain socket connections
 * Multithreading using a thread pool or on-demand thread creation
 * Connection keep-alive
 * Basic authentication (Digest access authentication is planned)
+* Cookies
 * Redirection
 * Conditional requests (if-modified-since)
 * UTF-8
