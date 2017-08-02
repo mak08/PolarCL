@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-08-02 00:20:05>
+;;; Last Modified  <michael 2017-08-03 00:10:19>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -279,10 +279,10 @@
                           (response
                            ;; Request Handling
                            (handle-request http-server connection request)))
-                     (log2:debug "Keepalive: ~a from ~a" (http-header response :|Connection|) response)
+                     (log2:debug "Keepalive: ~a from ~a" (http-header response :|connection|) response)
                      (let ((keepalive
                             ;; KeepAlive only if the response says keep-alive.
-                            (and (string= (http-header response :|Connection|) "keep-alive")
+                            (and (string= (http-header response :|connection|) "keep-alive")
                                  (keepalive-p request start-time))))
                        ;; Response post-processing: KeepAlive?
                        (setf (http-header response :|Connection|)
