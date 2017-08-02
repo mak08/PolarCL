@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling XMLHttpRequest-style http requests
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-03-16 23:44:29>
+;;; Last Modified  <michael 2017-08-02 23:34:47>
 
 (defpackage "POLARCL"
   (:use "COMMON-LISP"
@@ -51,14 +51,19 @@
            "HTTP-AUTHENTICATED-USER"
            "MAKE-HTTP-GET"
            "HEADERS"
+           "FIELD-NAME"
+           "FIELD-VALUE"
+           "GET-COOKIE"
            "SET-COOKIE"
+           "COOKIE-NAME"
+           "COOKIE-VALUE"
+           "COOKIE-OPTIONS"
            "HTTP-BODY"
            "HTTP-HEADER"
            "STATUS-CODE"
            "STATUS-TEXT"
            "PATH"
            "PARAMETERS"
-           "EXTRA-PARAMETERS"
            "HTTP-VERSION"
            "JSON"))
 
