@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-04-09 00:41:02>
+;;; Last Modified <michael 2017-08-02 23:27:36>
 
 ;;; ToDo:
 ;;;   Don't load configurations with LOAD.
@@ -11,12 +11,15 @@
 
 
 (defun load-configuration (path)
-  (when (probe-file path)
-    (let ((*package* (find-package "POLARCL")))
-      (stop-all-servers)
-      (sleep 5)
-      (reset)
-      (load path))))
+  (cond
+    ((probe-file path)
+     (let ((*package* (find-package "POLARCL")))
+       (stop-all-servers)
+       (sleep 5)
+       (reset)
+       (load path)))
+    (t
+     (error "File ~a not found" path))))
 
 (defmacro server (&rest args &key protocol &allow-other-keys)
   (let ((class (ecase protocol
