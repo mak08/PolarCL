@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-08-03 00:10:19>
+;;; Last Modified  <michael 2017-08-05 00:40:30>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -279,10 +279,10 @@
                           (response
                            ;; Request Handling
                            (handle-request http-server connection request)))
-                     (log2:debug "Keepalive: ~a from ~a" (http-header response :|connection|) response)
+                     (log2:debug "Keepalive: ~a from ~a" (http-header response :|Connection|) response)
                      (let ((keepalive
                             ;; KeepAlive only if the response says keep-alive.
-                            (and (string= (http-header response :|connection|) "keep-alive")
+                            (and (string= (http-header response :|Connection|) "keep-alive")
                                  (keepalive-p request start-time))))
                        ;; Response post-processing: KeepAlive?
                        (setf (http-header response :|Connection|)
@@ -335,9 +335,9 @@
                                  :for name-value-pair :in (cl-utilities:split-sequence #\; value)
                                  :for (name value) = (cl-utilities:split-sequence #\= name-value-pair)
                                  :collect (make-cookie :name (intern (string-left-trim " " (the simple-string name)) :keyword)
-                                                       :value value)))
+                                                       :value (string-left-trim " " value))))
                             (t
-                             value)))))
+                             (string-left-trim " " value))))))
 
 (defun get-request (server connection request-line)
   (labels (
@@ -445,7 +445,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun write-response (stream response)
-  (write-message-line stream "HTTP/1.0 ~a ~a"
+  (write-message-line stream "HTTP/1.1 ~a ~a"
                       (status-code response)
                       (status-text response))
   (write-headers (headers response) stream)
