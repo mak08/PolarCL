@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-08-01 23:48:48>
+;;; Last Modified <michael 2017-08-06 22:12:16>
 
 (in-package "POLARCL")
 
@@ -67,6 +67,12 @@
 (defun make-http-get (&rest args &key protocol host port headers body path parameters fragment http-version)
   (declare (ignorable host port headers body path parameters fragment http-version))
   (apply #'make-instance 'http-get args))
+
+(defclass http-head (http-request)
+  ((http-method :initform :head)))
+(defun make-http-head (&rest args &key protocol host port headers body path parameters fragment http-version)
+  (declare (ignorable host port headers body path parameters fragment http-version))
+  (apply #'make-instance 'http-head args))
 
 (defclass http-post (http-request)
   ((http-method :initform :post)))

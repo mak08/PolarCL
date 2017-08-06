@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-08-05 00:40:30>
+;;; Last Modified  <michael 2017-08-06 22:02:21>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -322,7 +322,7 @@
 (defun parse-request-header (line)
   (declare (string line))
   (log2:trace "<<< ~a" line)
-  (let* ((index (position #\colon line))
+  (let* ((index (position #\: line))
          (key (intern (string-downcase
                        (subseq line 0 index))
                       :keyword))
@@ -359,6 +359,7 @@
                       (request
                        (ecase (intern (string-upcase method) :keyword)
                          (:get (make-http-get :protocol protocol :port (mbedtls:server-port server)))
+                         (:head (make-http-head :protocol protocol :port (mbedtls:server-port server)))
                          (:post (make-http-post :protocol protocol :port (mbedtls:server-port server)))
                          (:put (make-http-put :protocol protocol :port (mbedtls:server-port server)))
                          (:options (make-http-options :protocol protocol :port (mbedtls:server-port server))))))
