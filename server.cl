@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-08-06 22:02:21>
+;;; Last Modified  <michael 2017-08-11 21:47:45>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -272,6 +272,7 @@
              (log2:debug "Waiting for request ~d" (incf k))
              (let ((start-time (get-internal-real-time))
                    (request-line (get-request-line)))
+               (log2:trace "<<< ~a" request-line)
                (when (null request-line) (go :finish))
                (handler-case 
                    (let* ((server (socket-server http-server))
@@ -339,54 +340,62 @@
                             (t
                              (string-left-trim " " value))))))
 
-(defun get-request (server connection request-line)
-  (labels (
-           (parse-url-query (string)
-             ;; Fixme: handle escaped chars =,& ?
-             (loop
-                :for pair :in (cl-utilities:split-sequence #\& string)
-                :for sep = (position #\= pair)
-                :collect (list (subseq pair 0 sep)
-                               (when sep (subseq pair (1+ sep))))))
-           (create-request (line)
-             (log2:trace "<<< ~a" line)
-             (destructuring-bind (&optional (method "INVALID") (query-path "") (http-version "HTTP/1.1"))
-                 (cl-utilities:split-sequence #\space line)
-               (let* ((url (net.uri:parse-uri query-path))
-                      (protocol (etypecase connection
-                                  (mbedtls:ssl-stream :https)
-                                  (mbedtls:plain-stream :http)))
-                      (request
-                       (ecase (intern (string-upcase method) :keyword)
-                         (:get (make-http-get :protocol protocol :port (mbedtls:server-port server)))
-                         (:head (make-http-head :protocol protocol :port (mbedtls:server-port server)))
-                         (:post (make-http-post :protocol protocol :port (mbedtls:server-port server)))
-                         (:put (make-http-put :protocol protocol :port (mbedtls:server-port server)))
-                         (:options (make-http-options :protocol protocol :port (mbedtls:server-port server))))))
-                 (setf (path request)
-                       (cdr (puri:uri-parsed-path  url)))
-                 (setf (parameters request)
-                       (parse-url-query (puri:uri-query url)))
-                 (setf (http-version request)
-                       http-version)
-                 request))))
-    ;; Read the request method and create an instance of the proper request subclass.
-    (let ((request
-           (create-request request-line)))
-      ;; Read header lines
-      (setf (headers request)
-            (loop
-               :for line = (mbedtls:get-line connection)
-               :while (and line
-                           ;; Headers are terminated by an empty line
-                           (> (length line) 0))
-               :collect (parse-request-header line)))
-      (typecase request
-        (http-post
-         ;; Read request body
-         ;;   This should be deferred, but remember to clear the input if the connection is kept alive. 
-         (get-body connection request)))
+(defun parse-url-query (string)
+  ;; Fixme: handle escaped chars =,& ?
+  (loop
+     :for pair :in (cl-utilities:split-sequence #\& string)
+     :for sep = (position #\= pair)
+     :collect (list (subseq pair 0 sep)
+                    (when sep (subseq pair (1+ sep))))))
+
+(defun parse-request-line (line)
+  (destructuring-bind (&optional (method "INVALID") (query-path "") (http-version "HTTP/1.1"))
+      (cl-utilities:split-sequence #\space line)
+    (values method
+            query-path
+            http-version)))
+
+(defun create-request (connection port line)
+  (multiple-value-bind (method query-path http-version)
+      (parse-request-line line)
+    (let* ((request
+            (case (intern (string-upcase method) :keyword)
+              (:get (make-http-get :connection connection :port port))
+              (:head (make-http-head :connection connection :port port))
+              (:post (make-http-post :connection connection :port port))
+              (:put (make-http-put :connection connection :port port))
+              (:options (make-http-options :connection connection :port port))
+              (otherwise
+               (error "Unsupported HTTP method ~a" method))))
+           (url (net.uri:parse-uri query-path))
+           (path (cdr (puri:uri-parsed-path  url)))
+           (parameters (parse-url-query (puri:uri-query url))))
+      (setf (path request) path)
+      (setf (parameters request) parameters)
+      (setf (http-version request) http-version)
       request)))
+
+(defun get-request (server connection request-line)
+  (let* ((request
+          ;; Read the request line and create an instance of the proper request subclass.
+          (create-request connection (mbedtls:server-port server) request-line))
+         (headers
+          ;; Read header lines
+          (loop
+             :for line = (mbedtls:get-line connection)
+             :while (and line
+                         ;; Headers are terminated by an empty line
+                         (> (length line) 0))
+             :collect (parse-request-header line))))
+    (unless (find ':|host| headers :key #'field-name)
+      (error "Missing Host"))
+    (setf (headers request) headers)
+    (typecase request
+      (http-post
+       ;; Read request body
+       ;;   This should be deferred, but remember to clear the input if the connection is kept alive. 
+       (get-body connection request)))
+    request))
 
 (defun get-body (stream request)
   (let* ((content-type (http-content-type request))

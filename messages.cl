@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-08-06 22:12:16>
+;;; Last Modified <michael 2017-08-11 21:20:58>
 
 (in-package "POLARCL")
 
@@ -9,10 +9,15 @@
 ;;; HTTP Request and Response
 
 (defclass http-basic ()
-  ((protocol :accessor http-protocol :initarg :protocol)
+  ((connection :accessor connection :initarg :connection)
    (port :accessor http-port :initarg :port)
    (headers :accessor headers :initarg :headers :initform ())
    (body :accessor body :initarg :body :initform "")))
+
+(defmethod http-protocol ((request http-basic))
+  (etypecase (connection request)
+    (mbedtls:ssl-stream :https)
+    (mbedtls:plain-stream :http)))
 
 (defclass http-header ()
   ((field-name :accessor field-name :initarg :name) 
@@ -64,37 +69,37 @@
 
 (defclass http-get (http-request)
   ((http-method :initform :get)))
-(defun make-http-get (&rest args &key protocol host port headers body path parameters fragment http-version)
+(defun make-http-get (&rest args &key connection host port headers body path parameters fragment http-version)
   (declare (ignorable host port headers body path parameters fragment http-version))
   (apply #'make-instance 'http-get args))
 
 (defclass http-head (http-request)
   ((http-method :initform :head)))
-(defun make-http-head (&rest args &key protocol host port headers body path parameters fragment http-version)
+(defun make-http-head (&rest args &key connection host port headers body path parameters fragment http-version)
   (declare (ignorable host port headers body path parameters fragment http-version))
   (apply #'make-instance 'http-head args))
 
 (defclass http-post (http-request)
   ((http-method :initform :post)))
-(defun make-http-post (&rest args &key protocol host port headers body path parameters fragment http-version)
+(defun make-http-post (&rest args &key connection host port headers body path parameters fragment http-version)
   (declare (ignorable host port headers body path parameters fragment http-version))
   (apply #'make-instance 'http-post args))
 
 (defclass http-put (http-request)
   ((http-method :initform :put)))
-(defun make-http-put (&rest args &key protocol host port headers body path parameters fragment http-version)
+(defun make-http-put (&rest args &key connection host port headers body path parameters fragment http-version)
   (declare (ignorable host port headers body path parameters fragment http-version))
   (apply #'make-instance 'http-put args))
 
 (defclass http-options (http-request)
   ((http-method :initform :options)))
-(defun make-http-options (&rest args &key protocol host port headers body path parameters fragment http-version)
+(defun make-http-options (&rest args &key connection host port headers body path parameters fragment http-version)
    (declare (ignorable host port headers body path parameters fragment http-version))
    (apply #'make-instance 'http-options args))
 
 (defclass http-connect (http-request)
   ((http-method :initform :connect)))
-(defun make-http-connect (&rest args &key protocol host port headers body path parameters fragment http-version)
+(defun make-http-connect (&rest args &key connection host port headers body path parameters fragment http-version)
   (declare (ignorable host port headers body path parameters fragment http-version))
   (apply #'make-instance 'http-connect args))
 
