@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-08-11 21:47:45>
+;;; Last Modified  <michael 2017-08-13 00:43:09>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -388,7 +388,7 @@
                          (> (length line) 0))
              :collect (parse-request-header line))))
     (unless (find ':|host| headers :key #'field-name)
-      (error "Missing Host"))
+      (error "Missing Host in ~a ~{~a~^, ~}" request-line headers))
     (setf (headers request) headers)
     (typecase request
       (http-post
