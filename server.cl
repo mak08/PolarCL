@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-08-13 00:43:09>
+;;; Last Modified  <michael 2017-08-30 23:17:55>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -342,11 +342,12 @@
 
 (defun parse-url-query (string)
   ;; Fixme: handle escaped chars =,& ?
-  (loop
-     :for pair :in (cl-utilities:split-sequence #\& string)
-     :for sep = (position #\= pair)
-     :collect (list (subseq pair 0 sep)
-                    (when sep (subseq pair (1+ sep))))))
+  (when (stringp string)
+    (loop
+       :for pair :in (cl-utilities:split-sequence #\& string)
+       :for sep = (position #\= pair)
+       :collect (list (subseq pair 0 sep)
+                      (when sep (subseq pair (1+ sep)))))))
 
 (defun parse-request-line (line)
   (destructuring-bind (&optional (method "INVALID") (query-path "") (http-version "HTTP/1.1"))
