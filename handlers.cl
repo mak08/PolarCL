@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-08-07 18:14:34>
+;;; Last Modified <michael 2017-10-16 23:21:38>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -463,8 +463,9 @@
   ((contentfn :reader handler-contentfn :initarg :contentfn)))
 
 (defmethod handle-response ((server http-server) (filter t) (handler dynhtml-handler) (request t) (response t))
-  (setf (http-body response)
-        (funcall (handler-contentfn handler) server handler request response)))
+  ;; Don't set the dynhtml-handler result as response body. If you want the response body automatically set,
+  ;; use qfunc handler.
+  (funcall (handler-contentfn handler) server handler request response))
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
