@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-10-16 23:21:38>
+;;; Last Modified <michael 2017-12-29 21:39:43>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -375,8 +375,8 @@
       (cond
         ((or (null if-modified-since)
              (ignore-errors
-               (> file-write-date (parse-integer if-modified-since))))
-         (setf (http-header response :|Last-Modified|) file-write-date)
+               (> file-write-date (parse-date if-modified-since))))
+         (setf (http-header response :|Last-Modified|) (format-date file-write-date))
          (handler-case 
              (with-open-file (f path :element-type '(unsigned-byte 8))
                (log2:debug "File ~a length ~d" path (file-length f))
