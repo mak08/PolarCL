@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-12-29 21:39:43>
+;;; Last Modified <root 2018-09-13 17:41:46>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -178,17 +178,17 @@
       (log2:trace "Redirecting request ~a using ~a" request redirector)
       (destructuring-bind (request-host &optional request-port)
           (cl-utilities:split-sequence #\: (http-host request))
-        (let ((scheme (or (redirector-scheme redirector)
-                          (http-protocol request)
-                          "http"))
-              (host (or (redirector-host redirector)
-                        request-host
-                        "localhost"))
-              (port (or (redirector-port redirector)
-                        request-port
-                        "80"))
-              (path (merge-paths (redirector-path redirector)
-                                 (http-path request))))
+        (let* ((scheme (or (redirector-scheme redirector)
+                           (http-protocol request)
+                           "http"))
+               (host (or (redirector-host redirector)
+                         request-host
+                         "localhost"))
+               (port (or (redirector-port redirector)
+                         request-port
+                         (default-port scheme)))
+               (path (merge-paths (redirector-path redirector)
+                                  (http-path request))))
           (make-redirect-response request
                                   (format () "~a://~a:~a~a" scheme host port path))))))
    ;; 2 - Find handler
@@ -208,6 +208,13 @@
    ;; 3 - No handler found. Reply with "Bad Request".
    (t
     (make-http-response :status-code "400" :status-text "Bad Request"))))
+
+(defun default-port (scheme)
+  (cond
+    ((string-equal scheme "http")
+     "80")
+    ((string-equal scheme "https")
+     "443")))
 
 (defun merge-paths (redirect-path request-path)
   (cond

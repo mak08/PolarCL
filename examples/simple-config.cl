@@ -1,15 +1,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-05-15 23:51:36>
+;;; Last Modified <michael 2018-09-13 17:45:23>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Logging settings
 
-(setf (log2:log-level "mbedtls") log2:+info+)
+(setf (log2:log-level "mbedtls") log2:+debug+)
 (setf (log2:log-level "mbedtls:accept") log2:+info+)
 (setf (log2:log-level "mbedtls:mbedtls-net-accept") log2:+info+)
-(setf (log2:log-level "mbedtls:create-config") log2:+info+)
+(setf (log2:log-level "mbedtls:create-config") log2:+debug+)
 (setf (log2:log-level "mbedtls:create-ssl-env") log2:+info+)
 (setf (log2:log-level "mbedtls:mbedtls-error-text") log2:+info+)
 
@@ -23,17 +23,19 @@
 ;;; -------
 
 ;;; Start one server on port 8080 
-(server :hostname "aguas-9"
+(server :hostname "localhost"
         :protocol :http
         :mt-method :ondemand
-        :port "8080"
+        :port "80"
         :max-handlers 10)
 
 ;;; Start another server on port 4443
 
-(server :hostname "aguas-9"
+(server :hostname "localhost"
         :protocol :https
-        :port "4443"
+        :port "443"
+        :cert-file "/home/michael/Certificates/example-com.cert.pem"
+        :key-file "/home/michael/Certificates/example-com.key.pem"
         :max-handlers 10)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
