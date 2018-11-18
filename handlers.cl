@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <root 2018-09-13 17:41:46>
+;;; Last Modified <michael 2018-11-18 16:53:50>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -18,7 +18,7 @@
 ;;; Request Processing
 ;;;
 ;;; Requests are processed either by a redirector, a handler, or by the 
-;;; "fall through" handler which returns a 400 NOT FOUND response by default.
+;;; "fall through" handler which returns a 404 NOT FOUND response by default.
 ;;;
 ;;; If a matching redirector is found, a 300 response should be returned.
 ;;; No authentication or further processing is performed.
@@ -207,7 +207,7 @@
            response)))))
    ;; 3 - No handler found. Reply with "Bad Request".
    (t
-    (make-http-response :status-code "400" :status-text "Bad Request"))))
+    (make-http-response :status-code "404" :status-text "Not found"))))
 
 (defun default-port (scheme)
   (cond
