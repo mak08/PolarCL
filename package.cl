@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling XMLHttpRequest-style http requests
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-08-02 23:34:47>
+;;; Last Modified  <michael 2018-12-05 20:50:01>
 
 (defpackage "POLARCL"
   (:use "COMMON-LISP"
@@ -64,6 +64,7 @@
            "STATUS-TEXT"
            "PATH"
            "PARAMETERS"
+           "PARSE-URL-QUERY"
            "HTTP-VERSION"
            "JSON"))
 
