@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2017-08-30 23:17:55>
+;;; Last Modified  <michael 2019-01-06 16:44:29>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -189,7 +189,7 @@
       ((>= handler-count (server-max-handlers http-server))
        (sleep 0.5))
       (t
-       (log2:debug "Accepting a new connection")
+       (log2:trace "Accepting a new connection")
        (mbedtls:with-server-connection-async ((connection server))
          (increase-handler-count handler-count)
          (log2:debug "Accepted a new connection (now active: ~a)" handler-count)
@@ -220,7 +220,7 @@
       (sleep 1))))
 
 (defun handler-thread (http-server)
-  (log2:debug "Accept loop started")
+  (log2:info "Accept loop started")
   (do ((requests 0)
        (server (socket-server http-server)))
       ((not (server-running http-server))
