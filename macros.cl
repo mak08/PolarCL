@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-04-09 00:48:42>
+;;; Last Modified <michael 2019-01-06 19:10:50>
 
 (in-package "POLARCL")
 
@@ -37,7 +37,7 @@
        (reverse (path ,request))
      (destructuring-bind (&optional package name)
          (cl-utilities:split-sequence #\: fname)
-       (log2:info "Searching function ~a:~a" (string-upcase package) name )
+       (log2:debug "Searching function ~a:~a" (string-upcase package) name )
        ;; Function names are case sensitive!
        (let ((,fsym (find-symbol name (string-upcase package))))
          (unless ,fsym
@@ -46,7 +46,7 @@
          (unless (member ,fsym *registered-functions*)
            (log2:warning "Unregistered function ~s" ,fsym)
            (error "Function ~s is not registered" ,fsym))
-         (log2:info "Executing ~a" ,fsym)
+         (log2:debug "Executing ~a" ,fsym)
          ,@body))))
 
 ;;; EOF
