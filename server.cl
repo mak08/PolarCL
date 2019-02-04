@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2019-01-06 16:44:29>
+;;; Last Modified  <michael 2019-02-04 20:54:26>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -208,7 +208,10 @@
          (threads
           (loop
              :for k :below (server-max-handlers http-server)
-             :for name = (format () "handler-~d" k)
+             :for name = (format () "handler-~a:~a-~d"
+                                 (server-hostname http-server)
+                                 (server-port http-server)
+                                 k)
              :collect (bordeaux-threads:make-thread
                        (lambda () (handler-thread http-server))
                        :name name))))
