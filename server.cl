@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2019-02-04 20:54:26>
+;;; Last Modified  <michael 2019-02-08 19:06:40>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -139,6 +139,7 @@
                  (when (socket-server http-server)
                    (log2:info "Releasing ~a:~a~%" (server-hostname http-server) (server-port http-server))
                    (mbedtls:close-socket (socket-server http-server))
+                   (mbedtls:deallocate (socket-server http-server))
                    (setf (socket-server http-server) nil)))
              (error (e)
                (log2:error "### RUN-HTTP-SERVER Error: ~a" e)))))
