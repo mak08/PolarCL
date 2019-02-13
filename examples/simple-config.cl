@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2018-09-13 17:45:23>
+;;; Last Modified <michael 2019-02-08 18:40:51>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Logging settings
@@ -26,14 +26,14 @@
 (server :hostname "localhost"
         :protocol :http
         :mt-method :ondemand
-        :port "80"
+        :port "8080"
         :max-handlers 10)
 
 ;;; Start another server on port 4443
 
 (server :hostname "localhost"
         :protocol :https
-        :port "443"
+        :port "4443"
         :cert-file "/home/michael/Certificates/example-com.cert.pem"
         :key-file "/home/michael/Certificates/example-com.key.pem"
         :max-handlers 10)
@@ -63,7 +63,7 @@
 ;;; to the file "index.html" at the same path
 (redirect
  :from (:regex ".*/")
- :to (:path "index.html"))
+ :to (:path "/examples/index.html"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ----------------
@@ -78,7 +78,7 @@
 
 (handle
  :request (:path "/index.html")
- :handler (:static "/var/www/html/index.html" :authentication nil))
+ :handler (:static "/examples/index.html" :authentication nil))
 
 (handle
  :request (:host '("127.0.1.1"))
