@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2019-02-08 18:40:51>
+;;; Last Modified <michael 2019-02-13 21:53:18>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Logging settings
@@ -78,7 +78,7 @@
 
 (handle
  :request (:path "/index.html")
- :handler (:static "/examples/index.html" :authentication nil))
+ :handler (:static "examples/" :authentication nil))
 
 (handle
  :request (:host '("127.0.1.1"))
