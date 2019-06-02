@@ -1,7 +1,13 @@
+
+;;; ### Use mbedtls_net_set_nonblock
+;;; ### Set listen backlog?
+;;; ### Move handler dispatch loop to mbedtls?
+;;; ### Use only accept() to dispatch?
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    HTTP Server
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2019-02-08 19:06:40>
+;;; Last Modified  <michael 2019-05-31 01:28:33>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Examples
@@ -169,34 +175,49 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; "on demand threads": Create handler threads on-demand for incoming connections
 
+(defvar *handler-count* 0)
+
 (defparameter +handler-count-lock+
   (bordeaux-threads:make-lock "handler-count"))
 
-(defun increase-handler-count (count)
+(defun increase-handler-count ()
   (bordeaux-threads:with-lock-held (+handler-count-lock+)
-    (incf count)))
+    (incf *handler-count*)))
 
-(defun decrease-handler-count (count)
+(defun decrease-handler-count ()
   (bordeaux-threads:with-lock-held (+handler-count-lock+)
-    (decf count)))
+    (decf *handler-count*)))
+
 
 (defun server-loop-ondemand (http-server)
-  (do ((server (socket-server http-server))
-       (handler-count 0)
-       (thread-id 0))
-      ((not (server-running http-server))
-       t)
-    (cond
-      ((>= handler-count (server-max-handlers http-server))
-       (sleep 0.5))
-      (t
-       (log2:trace "Accepting a new connection")
-       (mbedtls:with-server-connection-async ((connection server))
-         (increase-handler-count handler-count)
-         (log2:debug "Accepted a new connection (now active: ~a)" handler-count)
-         (unwind-protect 
-              (handle-connection http-server connection)
-           (decrease-handler-count handler-count)))))))
+  (let ((server (socket-server http-server))
+        (thread-id 0))
+    (flet ((on-demand-loop% ()
+             (do ()
+                 ((not (server-running http-server))
+                  (log2:info "Terminating.")
+                  t)
+               (handler-case 
+                   (cond
+                     ((>= *handler-count* (server-max-handlers http-server))
+                      (log2:info "Handler count reached, waiting 0.5s")
+                      (sleep 0.5))
+                     (t
+                      (log2:trace "Accepting a new connection")
+                      (mbedtls:with-server-connection-async ((connection server))
+                        (increase-handler-count)
+                        (log2:debug "Accepted a new connection (now active: ~a)" *handler-count*)
+                        (unwind-protect 
+                             (handle-connection http-server connection)
+                          (decrease-handler-count)))))
+                 (error (e)
+                   (log2:warning "~a" e))))))
+      (bordeaux-threads:make-thread #'on-demand-loop% :name "ON-DEMAND-LOOP")
+      (do ()
+          ((not (server-running http-server))
+           (log2:info "Terminating.")
+           t)
+        (sleep *loop-delay*)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; "thread pool": Create a fixed pool of handler. All threads are blocked in poll().
@@ -220,8 +241,9 @@
     ;; therefore don't join-threads here but just wait until *run* becomes false
     (do ()
         ((not (server-running http-server))
+         (log2:info "Terminating.")
          t)
-      (sleep 1))))
+      (sleep *loop-delay*))))
 
 (defun handler-thread (http-server)
   (log2:info "Accept loop started")
@@ -255,11 +277,11 @@
   (flet ((get-request-line ()
            (handler-case
                (mbedtls:get-line connection :timeout (mbedtls:keepalive connection))
-             (mbedtls:stream-empty-read ()
-               (log2:info "~a sent zero bytes, aborting request" (mbedtls:peer connection))
+             (mbedtls:stream-empty-read (errmsg)
+               (log2:trace "Empty read on ~a: ~a" (mbedtls:peer connection) errmsg)
                (return-from get-request-line nil))
-             (mbedtls:stream-read-error ()
-               (log2:info "~a inactive, aborting request" (mbedtls:peer connection))
+             (mbedtls:stream-read-error (errmsg)
+               (log2:trace "Read error on ~a: ~a" (mbedtls:peer connection) errmsg)
                (return-from get-request-line nil))))
          (keepalive-p (request start-time)
            (let ((now (get-internal-real-time)))

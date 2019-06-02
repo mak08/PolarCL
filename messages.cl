@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-08-11 21:20:58>
+;;; Last Modified <michael 2019-03-18 01:46:40>
 
 (in-package "POLARCL")
 
@@ -190,6 +190,7 @@
   (make-http-response :status-code "401"
                       :status-text "Not Authorized"
                       :headers (list (make-instance 'http-header :name :|WWW-Authenticate| :value (format () "Basic realm=~a" (handler-realm handler)))
+                                     (make-instance 'http-header :name :|Access-Control-Allow-Origin| :value "*")
                                      (make-instance 'http-header :name :|Connection| :value "close")
                                      (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 

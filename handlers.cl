@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2018-11-18 16:53:50>
+;;; Last Modified <michael 2019-06-02 10:54:40>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -142,17 +142,21 @@
 (defgeneric find-handler (connection request))
 
 (defmethod find-redirector ((connection t) (request t))
-  (log2:trace "find-redirector ~a ~a" connection request)
+  (log2:trace "Searching for redirector ~a ~a" connection request)
   (let ((redirector
          (find-if (lambda (d) (match-filter (dispatcher-filter d) request)) *redirectors*)))
-    (log2:trace "          ==> ~a" redirector)
+    (log2:debug "Found redirector ~a" redirector)
     redirector))
 
 (defmethod find-handler ((connection t) (request t))
   ;; Returns the *request-handlers* entry for $method and $path whose handler
   ;; has the longest match with $path. The handlers entry may contain several
   ;; functions, all of which will be called (except for errors)
-  (find-if (lambda (d) (match-filter (dispatcher-filter d) request)) *handlers*))
+  (log2:trace "Searching handler for ~a" request)
+  (let ((handler 
+         (find-if (lambda (d) (match-filter (dispatcher-filter d) request)) *handlers*)))
+    (log2:debug "Found handler: ~a" handler)
+    handler))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Standard request handling
@@ -375,7 +379,7 @@
     (setf (http-header response :|Content-Type|)
           (get-mime-for-extension (pathname-type path)))
     (unless (probe-file path)
-      (log2:trace "Mapped path ~a not found" path)
+      (log2:trace "Mapped path ~a not found" (truename path))
       (error "File ~a not found" request-path))
     (let ((if-modified-since (http-header request  :|if-modified-since|))
           (file-write-date (file-write-date path)))
@@ -400,14 +404,35 @@
 
 (defgeneric realpath (filter handler request))
 
-(defmethod realpath ((filter t) (handler file-handler) request)
+(defmethod realpath ((filter exact-filter) (handler file-handler) request)
   (let* ((host (http-host request))
          (request-path
-          (format () "/~{~a~^/~}" (path request))))
-    (parse-namestring
-     (concatenate 'string
-                  (handler-rootdir handler)
-                  (subseq request-path (length (filter-path filter)))))))
+          (format () "~{~a~^/~}" (path request))))
+    (log2:debug "Request path: ~a" request-path)
+    (log2:debug "Handler root path: ~a" (handler-rootdir handler))
+    (let ((realpath
+           (merge-pathnames
+            (merge-pathnames
+             request-path
+             (parse-namestring (handler-rootdir handler)))
+            *content-root*)))
+      (log2:debug "realpath: ~a" realpath)
+      realpath)))
+
+(defmethod realpath ((filter prefix-filter) (handler file-handler) request)
+  (let* ((host (http-host request))
+         (request-path
+          (format () "~{~a~^/~}" (path request))))
+    (log2:debug "Request path: ~a" request-path)
+    (log2:debug "Handler root path: ~a" (handler-rootdir handler))
+    (let ((realpath
+           (merge-pathnames
+            (merge-pathnames
+             request-path
+             (parse-namestring (handler-rootdir handler)))
+            *content-root*)))
+      (log2:debug "realpath: ~a" realpath)
+      realpath)))
 
 (defmethod realpath ((filter regex-filter) handler request)
   (error "Cannot determine realpath from ~a" filter))

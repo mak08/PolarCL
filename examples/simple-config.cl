@@ -1,21 +1,24 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2019-02-13 21:53:18>
+;;; Last Modified <michael 2019-06-02 11:08:04>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Logging settings
 
 (setf (log2:log-level "mbedtls") log2:+debug+)
-(setf (log2:log-level "mbedtls:accept") log2:+info+)
-(setf (log2:log-level "mbedtls:mbedtls-net-accept") log2:+info+)
+(setf (log2:log-level "mbedtls:accept") log2:+debug+)
+(setf (log2:log-level "mbedtls:mbedtls-net-accept") log2:+debug+)
+(setf (log2:log-level "mbedtls:write-to-stream") log2:+debug+)
 (setf (log2:log-level "mbedtls:create-config") log2:+debug+)
-(setf (log2:log-level "mbedtls:create-ssl-env") log2:+info+)
-(setf (log2:log-level "mbedtls:mbedtls-error-text") log2:+info+)
+(setf (log2:log-level "mbedtls:create-ssl-env") log2:+debug+)
+(setf (log2:log-level "mbedtls:mbedtls-error-text") log2:+debug+)
 
 (setf (log2:log-level "polarcl") log2:+trace+)
-(setf (log2:log-level "polarcl:server-loop-ondemand") log2:+info+)
-(setf (log2:log-level "polarcl:handler-thread") log2:+info+)
+(setf (log2:log-level "polarcl:server-loop-ondemand") log2:+trace+)
+(setf (log2:log-level "polarcl:server-loop-pooled") log2:+trace+)
+(setf (log2:log-level "polarcl:find-redirector") log2:+debug+)
+(setf (log2:log-level "polarcl:handler-thread") log2:+debug+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; -------
@@ -27,15 +30,24 @@
         :protocol :http
         :mt-method :ondemand
         :port "8080"
-        :max-handlers 10)
+        :max-handlers 3)
+
+;;; Start one server on port 8081
+;;; Does not work yet - handler port cannot be specified and must be one of 80, 8080, 443, 4443.
+#+()(server :hostname "localhost"
+        :protocol :http
+        :mt-method :ondemand
+        :port "8081"
+        :max-handlers 3)
 
 ;;; Start another server on port 4443
-
-(server :hostname "localhost"
+#+()(server :hostname "localhost"
         :protocol :https
         :port "4443"
-        :cert-file "/home/michael/Certificates/example-com.cert.pem"
-        :key-file "/home/michael/Certificates/example-com.key.pem"
+        ;; :cert-file "/home/michael/Certificates/example-com.cert.pem"
+        :cert-file "/home/michael/Certificates/polarcl.crt"
+        ;; :key-file "/home/michael/Certificates/example-com.key.pem"
+        :key-file "/home/michael/Certificates/polarcl.key"
         :max-handlers 10)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -63,7 +75,7 @@
 ;;; to the file "index.html" at the same path
 (redirect
  :from (:regex ".*/")
- :to (:path "/examples/index.html"))
+ :to (:path "/index.html"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ----------------
@@ -83,15 +95,15 @@
 (handle
  :request (:host '("127.0.1.1"))
  :handler (:dynamic (lambda (s h req res)
+                      (declare (ignore s h req))
                       (setf (status-code res) "666"))))
 
 ;;; A :static handler, serving any files below the path :prefix /content/pages.
 ;;; The real path is found by replacing the path prefix with the static root path.
 ;;; Login as 'guest' required
 (handle
- :request (:method :get
-           :prefix "/content/pages")
- :handler (:static "/var/www/html/michael" :realm "localhost"))
+ :request (:method :get :prefix "/content/pages")
+ :handler (:static "/var/www/html/" :realm "localhost"))
 
 ;;; A :dynamic handler calls the specified function on the matched request and
 ;;; and a default "OK" response. Login as 'admin' required.
@@ -99,7 +111,7 @@
  :request (:method :get
            :path "/quit")
  :handler (:dynamic (lambda (server handler request response)
-                                       (declare (ignore response))
+                                       (declare (ignore server response))
                                        (if (string= (http-authenticated-user handler request)
                                                     "admin")
                                            (progn (stop-all-servers)

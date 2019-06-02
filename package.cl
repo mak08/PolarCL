@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling XMLHttpRequest-style http requests
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2018-12-05 20:50:01>
+;;; Last Modified  <michael 2019-05-27 23:09:27>
 
 (defpackage "POLARCL"
   (:use "COMMON-LISP"
@@ -23,7 +23,8 @@
      ;; USOCKET
      "SOCKET-CONNECT"
      "SOCKET-ERROR")
-  (:export "LOAD-CONFIGURATION"
+  (:export "*CONTENT-ROOT*"
+           "LOAD-CONFIGURATION"
            "SERVER"
            "USER"
            "REDIRECT"

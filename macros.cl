@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2019-01-06 19:10:50>
+;;; Last Modified <michael 2019-06-02 10:54:36>
 
 (in-package "POLARCL")
 
@@ -26,11 +26,13 @@
 
 
 (defmacro nnmember (item listform &key (test 'string=))
-  (let ((listvar (gensym "list-")))
-    `(let ((,listvar ,listform))
-       (or (null ,listvar)
-           (member ,item ,listvar :test ',test)))))
-
+  (let ((listvar (gensym "list-"))
+        (resultvar (gensym "result-")))
+    `(let* ((,listvar ,listform)
+            (,resultvar (or (null ,listvar)
+                            (member ,item ,listvar :test ',test))))
+       (log2:trace "Checking ~a in ~a ==> ~a" ,item ,listvar ,resultvar)
+       ,resultvar)))
 
 (defmacro with-func-from-path ((fsym request) &body body)
   `(destructuring-bind (fname &rest namespace)

@@ -2,7 +2,7 @@
 ;;; Description
 ;;; Author         Michael Kappert
 ;;; Created        22/03/2000 11:15:16
-;;; Last Modified  <michael 2017-12-29 21:44:37>
+;;; Last Modified  <michael 2019-05-27 23:00:33>
 
 (defsystem "polarcl"
   :description "Web server based on mbedtls"
@@ -10,6 +10,7 @@
   :depends-on ("cl-mbedtls" "zlib" "puri" "regex" "cl-base64" "cffi" "local-time")
   :serial t
   :components ((:file "package")
+               (:file "common")
                (:file "macros")
                (:file "http-date")
                (:file "octet-streams")

@@ -1,25 +1,40 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2017-08-02 23:27:36>
+;;; Last Modified <michael 2019-06-01 17:59:19>
 
-;;; ToDo:
-;;;   Don't load configurations with LOAD.
-;;;   Provide a load function that resets the *handlers* list etc.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ToDo
+;;;
+;;;   Administration:
+;;;   - Refined configuration loading
+;;;   - Starting & stopping
+
 
 (in-package polarcl)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Load configuration
 
 (defun load-configuration (path)
+  "Terminate any running servers and bring up servers according to the configuration in $path.
+The configuration file should contain SERVER, USER, REDIRECT and HANDLE statements.
+It is loaded by LOAD. In particular, *package* and other globals are bound as usual."
   (cond
     ((probe-file path)
-     (let ((*package* (find-package "POLARCL")))
-       (stop-all-servers)
-       (sleep 5)
-       (reset)
-       (load path)))
+     (handler-case
+         (progn
+           (stop-all-servers)
+           (sleep (1+ *loop-delay*))
+           (reset)
+           (load path))
+       (error (e)
+         (log2:info "~a" e))))
     (t
      (error "File ~a not found" path))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
 
 (defmacro server (&rest args &key protocol &allow-other-keys)
   (let ((class (ecase protocol
@@ -27,10 +42,19 @@
                  (:https 'https-server))))
     (remf args :protocol)
     `(let ((server (make-instance ',class ,@args)))
+       (log2:info "Adding SERVER: ~a" server)
        (run-http-server server))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+
 (defmacro user (&key username realm password)
-  `(register-user ,username ,realm ,password))
+  `(let ()
+     (log2:info "Adding USER ~a@~a" ,username ,realm)
+     (register-user ,username ,realm ,password)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
 
 (defmacro redirect (&key from to)
   (destructuring-bind (&key (method :get) scheme host port regex path (prefix ""))
@@ -50,7 +74,12 @@
              `(create-filter 'exact-filter :method ',methods :protocol ',protocols :host ,host :path ,prefix))))
          (redirector
           `(create-redirector ,@to)))
-      `(register-redirector :filter ,filter :redirector ,redirector))))
+      `(let ()
+         (log2:info "Adding REDIRECTOR ~a ~a" ,filter ,redirector) 
+         (register-redirector :filter ,filter :redirector ,redirector)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
 
 (defmacro handle (&key request handler)
   (let ((handler
@@ -81,7 +110,9 @@
                `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :realm ,realm))
               (query-function
                `(create-handler 'qfunc-handler :authentication ,authentication :realm ,realm)))))
-        `(register-handler :filter ,filter :handler ,handler))))))
+        `(let ()
+           (log2:info "Adding HANDLER ~a ~a" ,filter ,handler)
+           (register-handler :filter ,filter :handler ,handler)))))))
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
