@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2019-06-01 17:59:19>
+;;; Last Modified <michael 2020-01-24 20:20:14>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo
@@ -90,7 +90,7 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
             handler))))
   (destructuring-bind (&key host (method :get) path prefix)
       request
-    (destructuring-bind (&key static dynamic query-function realm (authentication :basic))
+    (destructuring-bind (&key static dynamic query-function request-function realm (authentication :basic))
         handler
       (let*
           ((methods (if (atom method) (list method) method))
@@ -109,7 +109,9 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
               (dynamic
                `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :realm ,realm))
               (query-function
-               `(create-handler 'qfunc-handler :authentication ,authentication :realm ,realm)))))
+               `(create-handler 'qfunc-handler :authentication ,authentication :realm ,realm))
+              (request-function
+               `(create-handler 'rfunc-handler :authentication ,authentication :realm ,realm)))))
         `(let ()
            (log2:info "Adding HANDLER ~a ~a" ,filter ,handler)
            (register-handler :filter ,filter :handler ,handler)))))))
