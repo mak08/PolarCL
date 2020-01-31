@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2019-03-18 01:46:40>
+;;; Last Modified <michael 2020-01-31 04:03:16>
 
 (in-package "POLARCL")
 
@@ -111,7 +111,7 @@
 
 (defun http-header (r name)
   ;; Don't modify the header here
-  (let ((header (find name (headers r) :key #'field-name)))
+  (let ((header (find name (headers r) :key #'field-name :test #'string-equal)))
     (when header
       (field-value header))))
 
