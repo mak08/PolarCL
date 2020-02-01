@@ -497,14 +497,13 @@
     (mbedtls:write-to-stream stream #(13 10))))
 
 (defun write-body (stream body)
-  (log2:trace ">>> ~a" (subseq body 0 (min 20 (length body))))
+  (log2:trace ">>> Body: ~a" (subseq body 0 (min 20 (length body))))
   (etypecase body
     (string
       (mbedtls:write-to-stream stream (string-to-octets body)))
     (vector
       (mbedtls:write-to-stream stream body)))
-  (mbedtls:write-to-stream stream #(13 10))
-  (mbedtls:write-to-stream stream #(13 10)))
+  (log2:trace ">>> Body: wrote ~a chars/bytes" (length body)))
 
 (defun write-headers (headers stream)
   (loop
