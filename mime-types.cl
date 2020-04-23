@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2015
-;;; Last Modified <michael 2017-02-24 00:14:48>
+;;; Last Modified <michael 2020-02-08 01:18:58>
 
 (in-package "POLARCL")
 
@@ -16,6 +16,7 @@
     ("pdf"                      "application/pdf"             "PDF-Dateien")
     ("ai eps ps"                "application/postscript"      "PostScript-Dateien")
     ;; ("htm html shtml xhtml"     "application/xhtml+xml"       "XHTML-Dateien")
+    ("svg"                      "image/svg+xml"             "???") 
     ("xml"                      "application/xml"             "XML-Dateien")
     ("zip"                      "application/zip"             "ZIP-Archivdateien")
     ("gif"                      "image/gif"                   "GIF-Dateien")

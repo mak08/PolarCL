@@ -2,7 +2,7 @@
 ;;; Description
 ;;; Author         Michael Kappert
 ;;; Created        22/03/2000 11:15:16
-;;; Last Modified  <michael 2019-05-27 23:00:33>
+;;; Last Modified  <michael 2020-02-12 20:43:15>
 
 (defsystem "polarcl"
   :description "Web server based on mbedtls"
@@ -16,6 +16,8 @@
                (:file "octet-streams")
                ;; (:file "headers")
                (:file "messages")
+               (:file "cookies")
+
                (:file "server")
                ;; (:file "client")
                (:file "mime-types")

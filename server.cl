@@ -312,8 +312,12 @@
                             (and (string= (http-header response :|Connection|) "keep-alive")
                                  (keepalive-p request start-time))))
                        ;; Response post-processing: KeepAlive?
-                       (setf (http-header response :|Connection|)
-                             (if keepalive "keep-alive" "close"))
+                       (cond
+                         (keepalive
+                          (setf (http-header response :|Connection|) "Keep-Alive")
+                          (setf (http-header response :|Keep-Alive|) "timeout=5, max=100"))
+                         (t
+                          (setf (http-header response :|Connection|) "close")))
                        (log2:debug "KeepAlive ~a: request ~a" connection k)
                        (handler-case
                            (progn
@@ -327,7 +331,9 @@
                          (mbedtls:stream-write-error (e)
                            (log2:error "~a Write failed: ~a" (mbedtls:peer connection) e)))
                        ;; KeepAlive: wait for another request
-                       (when keepalive (go :start))))
+                       (when keepalive
+                         (log2:debug "Keep-Alive: ready")
+                         (go :start))))
                  (error (e)
                    (log2:warning "~a Caught error: ~a" (mbedtls:peer connection) e)
                    (handler-case
@@ -358,11 +364,7 @@
                    :name key
                    :value (case key
                             (:|cookie|
-                              (loop
-                                 :for name-value-pair :in (cl-utilities:split-sequence #\; value)
-                                 :for (name value) = (cl-utilities:split-sequence #\= name-value-pair)
-                                 :collect (make-cookie :name (intern (string-left-trim " " (the simple-string name)) :keyword)
-                                                       :value (string-left-trim " " value))))
+                              (parse-cookies value))
                             (t
                              (string-left-trim " " value))))))
 
@@ -427,49 +429,53 @@
 (defun get-body (stream request)
   (let* ((content-type (http-content-type request))
          (content-length (when (http-content-length request)
-                           (parse-integer (http-content-length request))))
-         (transfer-encoding (http-transfer-encoding request))
-         (content-encoding (http-content-encoding request))
-         (content-charset (http-charset request))
-         (chunks
-          (cond
-            (content-length
-             (let* ((octets
-                     (mbedtls:get-octets stream content-length))
-                    (chunk (cond
-                             ((null content-encoding)
-                              octets)
-                             ((string= content-encoding "gzip")
-                              (zlib:gunzip octets))
-                             (t
-                              (error "Content encoding ~a not supported" content-encoding)))))
-               (list chunk)))
-            ((search "chunked" transfer-encoding)
-             ;; http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6
-             (do ((chunk-size (get-chunk-size stream) (get-chunk-size stream))
-                  (body ()))
-                 ((= chunk-size 0)
-                  (nreverse body))
-               (push (mbedtls:get-octets stream chunk-size) body)
-               (mbedtls:get-octets stream 2)))
-            (t
-             (log2:warning "No Content-length protocol, reading until EOS")
-             (list (mbedtls:get-octets stream nil)))))
-         (body
-          (cond
-            ((or (search "application/octet-stream" content-type)
-                 (search "image/png" content-type))
-             (apply #'concatenate '(vector (unsigned-byte 8)) chunks))
-            ((or (search "text/" content-type)
-                 (search "application/xml" content-type)
-                 (search "application/x-www-form-urlencoded" content-type))
-             (apply #'concatenate 'string
-                    (mapcar (lambda (chunk)
-                              (octets-to-string chunk :encoding content-charset))
-                            chunks)))
-            (t
-             (error "Unknown content type ~a" content-type)))))
-    (setf (body request) body)))
+                           (parse-integer (http-content-length request)))))
+    (case content-length
+      (0
+       (setf (body request) ""))
+      (otherwise
+       (let* ((transfer-encoding (http-transfer-encoding request))
+              (content-encoding (http-content-encoding request))
+              (content-charset (http-charset request))
+              (chunks
+               (cond
+                 (content-length
+                  (let* ((octets
+                          (mbedtls:get-octets stream content-length))
+                         (chunk (cond
+                                  ((null content-encoding)
+                                   octets)
+                                  ((string= content-encoding "gzip")
+                                   (zlib:gunzip octets))
+                                  (t
+                                   (error "Content encoding ~a not supported" content-encoding)))))
+                    (list chunk)))
+                 ((search "chunked" transfer-encoding)
+                  ;; http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6
+                  (do ((chunk-size (get-chunk-size stream) (get-chunk-size stream))
+                       (body ()))
+                      ((= chunk-size 0)
+                       (nreverse body))
+                    (push (mbedtls:get-octets stream chunk-size) body)
+                    (mbedtls:get-octets stream 2)))
+                 (t
+                  (log2:warning "No Content-length protocol, reading until EOS")
+                  (list (mbedtls:get-octets stream nil)))))
+              (body
+               (cond
+                 ((or (search "application/octet-stream" content-type)
+                      (search "image/png" content-type))
+                  (apply #'concatenate '(vector (unsigned-byte 8)) chunks))
+                 ((or (search "text/" content-type)
+                      (search "application/xml" content-type)
+                      (search "application/x-www-form-urlencoded" content-type))
+                  (apply #'concatenate 'string
+                         (mapcar (lambda (chunk)
+                                   (octets-to-string chunk :encoding content-charset))
+                                 chunks)))
+                 (t
+                  (error "Unknown content type ~a" content-type)))))
+         (setf (body request) body))))))
 
 (defun get-chunk-size (stream)
   (let* ((hex-digits (mbedtls:get-line stream))

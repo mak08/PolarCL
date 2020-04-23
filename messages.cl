@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2020-01-31 04:03:16>
+;;; Last Modified <michael 2020-02-11 23:53:21>
 
 (in-package "POLARCL")
 
@@ -132,28 +132,6 @@
   (setf (body r) value))
 
 (defsetf http-body set-http-body)
-
-(defstruct cookie name value (options ""))
-(defmethod print-object ((object cookie) stream)
-  (format stream "~a=~a;~a"
-          (cookie-name object)
-          (cookie-value object)
-          (cookie-options object)))
-
-(defgeneric get-cookie (r name))
-(defmethod  get-cookie ((r http-request) name)
-  (let ((cookies (find  :|cookie| (headers r) :key #'field-name)))
-    (when cookies
-      (find name (field-value cookies) :key #'cookie-name :test #'string=))))
-
-(defgeneric set-cookie (r name value))
-(defmethod set-cookie ((r http-request) name value)
-  (error "NYI"))
-(defmethod set-cookie ((r http-response) name value)
-  (let ((new-header (make-instance 'http-header
-                                   :name :|Set-Cookie|
-                                   :value (make-cookie :name name :value value))))
-    (push new-header (headers r))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Predefined / template responses

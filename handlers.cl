@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2019-06-02 10:54:40>
+;;; Last Modified <michael 2020-02-29 21:11:13>
 
 ;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
 ;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
@@ -387,7 +387,7 @@
         ((or (null if-modified-since)
              (ignore-errors
                (> file-write-date (parse-date if-modified-since))))
-         (setf (http-header response :|Last-Modified|) (format-date file-write-date))
+         (setf (http-header response :|Last-Modified|) (format-date-imf nil file-write-date))
          (handler-case 
              (with-open-file (f path :element-type '(unsigned-byte 8))
                (log2:debug "File ~a length ~d" path (file-length f))
@@ -469,7 +469,7 @@
     (funcall fsym handler request response)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; 2-2 'Query Functions'
+;;; 2-2 'Query
 ;;;
 ;;; qfunc receive the query parameters as keyword arguments. The result is returned
 ;;; as the response body

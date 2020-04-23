@@ -39,3 +39,4 @@ Furthermore, PolarCL supports server-side programming in Common Lisp
 
 # Bugs:
   *	POSTing an empty body results in timeout
+  *	Client hangs when connection is kept alive?	
