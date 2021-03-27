@@ -27,8 +27,6 @@
 ;;; - Response mime type determination is sloppy
 ;;; - Make QUIT a restricted function
 
-;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
-;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
 ;; (setf *print-miser-width* nil)
 
 (in-package "POLARCL")
@@ -296,49 +294,55 @@
            (tagbody
              :start
              (log2:debug "Waiting for request ~d" (incf k))
-             (let ((start-time (get-internal-real-time))
-                   (request-line (get-request-line)))
+             (let* ((start-time (get-internal-real-time))
+                    (request-line (get-request-line))
+                    (request nil))
                (log2:trace "<<< ~a" request-line)
                (when (null request-line) (go :finish))
-               (handler-case 
-                   (let* ((server (socket-server http-server))
-                          (request (get-request server connection request-line))
-                          (response
-                           ;; Request Handling
-                           (handle-request http-server connection request)))
-                     (log2:debug "Keepalive: ~a from ~a" (http-header response :|Connection|) response)
-                     (let ((keepalive
-                            ;; KeepAlive only if the response says keep-alive.
-                            (and (string= (http-header response :|Connection|) "keep-alive")
-                                 (keepalive-p request start-time))))
-                       ;; Response post-processing: KeepAlive?
-                       (cond
-                         (keepalive
-                          (setf (http-header response :|Connection|) "Keep-Alive")
-                          (setf (http-header response :|Keep-Alive|) "timeout=5, max=100"))
-                         (t
-                          (setf (http-header response :|Connection|) "close")))
-                       (log2:debug "KeepAlive ~a: request ~a" connection k)
-                       (handler-case
-                           (progn
-                             (write-response connection response)
-                             (log2:info "~a ~a ~a ~a ~a"
-                                        (server-port http-server)
-                                        (status-code response)
-                                        (if keepalive "A" "C")
-                                        (mbedtls:format-ip (mbedtls:peer connection))
-                                        (format-request-info request)))
-                         (mbedtls:stream-write-error (e)
-                           (log2:error "~a Write failed: ~a" (mbedtls:peer connection) e)))
-                       ;; KeepAlive: wait for another request
-                       (when keepalive
-                         (log2:debug "Keep-Alive: ready")
-                         (go :start))))
+               (handler-case
+                   (progn
+                     (setf request
+                           (create-request connection
+                                           (mbedtls:server-port (socket-server http-server))
+                                           request-line))
+                     (read-request connection request)
+                     (let* ((response
+                             ;; Request Handling
+                             (handle-request http-server connection request)))
+                       (log2:debug "Keepalive: ~a from ~a" (http-header response :|Connection|) response)
+                       (let ((keepalive
+                              ;; KeepAlive only if the response says keep-alive.
+                              (and (string= (http-header response :|Connection|) "keep-alive")
+                                   (keepalive-p request start-time))))
+                         ;; Response post-processing: KeepAlive?
+                         (cond
+                           (keepalive
+                            (setf (http-header response :|Connection|) "Keep-Alive")
+                            (setf (http-header response :|Keep-Alive|) "timeout=5, max=100"))
+                           (t
+                            (setf (http-header response :|Connection|) "close")))
+                         (log2:debug "KeepAlive ~a: request ~a" connection k)
+                         (handler-case
+                             (progn
+                               (write-response connection response)
+                               (log2:info "~a ~a ~a ~a ~a"
+                                          (server-port http-server)
+                                          (status-code response)
+                                          (if keepalive "A" "C")
+                                          (mbedtls:format-ip (mbedtls:peer connection))
+                                          (format-request-info request)))
+                           (mbedtls:stream-write-error (e)
+                             (log2:error "~a Write failed: ~a" (mbedtls:peer connection) e)))
+                         ;; KeepAlive: wait for another request
+                         (when keepalive
+                           (log2:debug "Keep-Alive: ready")
+                           (go :start)))))
                  (error (e)
                    (log2:warning "~a Caught error: ~a" (mbedtls:peer connection) e)
                    (handler-case
                        (write-response connection
-                                       (make-error-response :body (format () "~a" e)
+                                       (make-error-response request
+                                                            :body (format () "~a" e)
                                                             :status-code "400"
                                                             :status-text "Invalid request"))
                      (mbedtls:stream-write-error (e)
@@ -404,11 +408,8 @@
       (setf (http-version request) http-version)
       request)))
 
-(defun get-request (server connection request-line)
-  (let* ((request
-          ;; Read the request line and create an instance of the proper request subclass.
-          (create-request connection (mbedtls:server-port server) request-line))
-         (headers
+(defun read-request (connection request)
+  (let* ((headers
           ;; Read header lines
           (loop
              :for line = (mbedtls:get-line connection)
@@ -417,7 +418,7 @@
                          (> (length line) 0))
              :collect (parse-request-header line))))
     (unless (find ':|host| headers :key #'field-name)
-      (error "Missing Host in ~a ~{~a~^, ~}" request-line headers))
+      (error "Missing Host in ~a" request))
     (setf (headers request) headers)
     (typecase request
       (http-post

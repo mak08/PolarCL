@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2020-02-11 23:53:21>
+;;; Last Modified <michael 2020-08-06 21:46:18>
 
 (in-package "POLARCL")
 
@@ -28,7 +28,8 @@
           (field-value object)))
 
 (defclass http-response (http-basic)
-  ((status-code :accessor status-code :initarg :status-code)
+  ((request :reader request :initarg :request)
+   (status-code :accessor status-code :initarg :status-code)
    (status-text :accessor status-text :initarg :status-text)))
 (defmethod print-object ((object http-response) stream)
   (format stream "<RESPONSE ~a ~a ~a>"
@@ -36,7 +37,7 @@
           (status-text object)
           (ignore-errors (subseq (body object) 0 10))))
           
-(defun make-http-response (&rest args &key host port headers body status-code status-text)
+(defun make-http-response (&rest args &key request host port headers body status-code status-text)
   (declare (ignorable host port headers body status-code status-text))
   (apply #'make-instance 'http-response args))
 
@@ -126,19 +127,68 @@
 (defun http-body (r)
   (body r))
 
-(defun set-http-body (r value)
-  (setf (http-header r :|Content-Length|)
-        (length value))
-  (setf (body r) value))
-
 (defsetf http-body set-http-body)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Response body
+
+(defmethod set-http-body ((message http-basic) value)
+  (setf (http-header message :|Content-Length|)
+        (length value))
+  (setf (body message) value))
+
+(defmethod set-http-body ((response http-response) (body string))
+  (let* ((request (request response))
+         (accept-encoding (http-header request :accept-encoding)))
+    (log2:info "Encoding: ~a" accept-encoding)
+    (cond
+      ((search "gzip" accept-encoding)
+       (setf (http-header response :|Content-Encoding|)
+             "gzip")
+       (setf (body response)
+             (zlib:gzip body)))
+      ((search "compress" accept-encoding)
+       (setf (http-header response :|Content-Encoding|)
+             "compress")
+       (setf (body response)
+             (zlib:compress body)))
+      (t
+       (setf (body response)
+             body)))
+    (setf (http-header response :|Content-Length|)
+          (length (body response))))
+  response)
+
+(defmethod set-http-body ((response http-response) (body vector))
+  (let* ((request (request response))
+         (accept-encoding (http-header request :accept-encoding)))
+    (log2:trace "Encoding: ~a" accept-encoding)
+    (cond
+      ((search "gzip" accept-encoding)
+       (setf (http-header response :|Content-Encoding|)
+             "gzip")
+       (setf (body response)
+             (zlib:gzip-bytes body)))
+      ((search "compress" accept-encoding)
+       (setf (http-header response :|Content-Encoding|)
+             "compress")
+       (setf (body response)
+             (zlib:compress-bytes body)))
+      (t
+       (setf (body response)
+             body)))
+    (setf (http-header response :|Content-Length|)
+          (length (body response))))
+  response)
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Predefined / template responses
 
 (defun make-ok-response (request)
-  (declare (ignorable request))
-  (make-http-response :status-code "200"
+  (make-http-response :request request
+                      :status-code "200"
                       :status-text "OK"
                       :headers (list (make-instance 'http-header :name :|Access-Control-Allow-Origin| :value "*")
                                      (make-instance 'http-header :name :|Content-Type| :value "text/html")
@@ -146,8 +196,8 @@
                                      (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-redirect-response (request location)
-  (declare (ignorable request))
-  (make-http-response :status-code "302"
+  (make-http-response :request request
+                      :status-code "302"
                       :status-text "Found"
                       :headers (list
                                 (make-instance 'http-header :name :|Location| :value location)
@@ -155,8 +205,8 @@
                                 (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-permanent-redirect-response (request location)
-  (declare (ignorable request))
-  (make-http-response :status-code "301"
+  (make-http-response :request request
+                      :status-code "301"
                       :status-text "Moved Permanently"
                       :headers (list
                                 (make-instance 'http-header :name :|Location| :value  location)
@@ -164,8 +214,8 @@
                                 (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-authenticate-response (handler request)
-  (declare (ignorable request))
-  (make-http-response :status-code "401"
+  (make-http-response :request request
+                      :status-code "401"
                       :status-text "Not Authorized"
                       :headers (list (make-instance 'http-header :name :|WWW-Authenticate| :value (format () "Basic realm=~a" (handler-realm handler)))
                                      (make-instance 'http-header :name :|Access-Control-Allow-Origin| :value "*")
@@ -173,19 +223,20 @@
                                      (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-notfound-response (handler request)
-  (declare (ignorable request))
-  (make-http-response :status-code "404"
+  (make-http-response :request request
+                      :status-code "404"
                       :status-text "Not Found"
                       :headers (list (make-instance 'http-header :name :|Connection| :value "close")
                                      (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
-(defun make-error-response (&key
+(defun make-error-response (request &key
                               (status-code "500")
                               (status-text "An error occurred")
                               (headers (list (make-instance 'http-header :name :|Connection| :value "close")
                                              (make-instance 'http-header :name :|Server| :value "PolarCL")))
                               (body "An error occurred. We're sorry."))
-  (make-http-response :status-code status-code
+  (make-http-response :request request
+                      :status-code status-code
                       :status-text status-text
                       :headers headers
                       :body body))
@@ -222,6 +273,7 @@
     (intern
      (string-upcase (strip-name encoding))
      :keyword)))
+
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

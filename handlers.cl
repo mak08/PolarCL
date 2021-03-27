@@ -1,10 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2020-02-29 21:11:13>
-
-;; (declaim (optimize (debug 0) (safety 0) (speed 3) (space 0)))
-;; (declaim (optimize (debug 3) (safety 3) (speed 0) (space 0)))
+;;; Last Modified <michael 2021-03-20 20:50:41>
 
 (in-package "POLARCL")
 
@@ -211,7 +208,7 @@
            response)))))
    ;; 3 - No handler found. Reply with "Bad Request".
    (t
-    (make-http-response :status-code "404" :status-text "Not found"))))
+    (make-http-response :request request :status-code "404" :status-text "Not found"))))
 
 (defun default-port (scheme)
   (cond
@@ -471,7 +468,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 2-2 'Query
 ;;;
-;;; qfunc receive the query parameters as keyword arguments. The result is returned
+;;; qfunc receives the query parameters as keyword arguments. The result is returned
 ;;; as the response body
 
 (defclass qfunc-handler (handler)
