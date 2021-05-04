@@ -252,14 +252,16 @@
        t)
     (handler-case
         (mbedtls:with-server-connection ((conn server))
-          (log2:debug "Accepting a new connection")
+          (log2:info "Accepting a new connection")
           (when (and conn (server-running http-server))
             (incf requests)
-            (log2:debug "Accepted connection ~d" requests)
+            (log2:info "Accepted connection ~d" requests)
             (handle-connection http-server conn)))
+      (mbedtls:stream-timeout (e)
+        (log2:info "Timeout: ~a" e))
       (error (e)
         (log2:error "Caught error: ~a" e))))
-  (log2:debug "Accept loop finished, thread exiting"))
+  (log2:info "Accept loop finished, thread exiting"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; HANDLE-CONNECTION
@@ -275,6 +277,9 @@
   (flet ((get-request-line ()
            (handler-case
                (mbedtls:get-line connection :timeout (mbedtls:keepalive connection))
+             (mbedtls:stream-timeout (e)
+               (log2:trace "Timeout on ~a: ~a" (mbedtls:peer connection) e)
+               (return-from get-request-line nil))
              (mbedtls:stream-empty-read (errmsg)
                (log2:trace "Empty read on ~a: ~a" (mbedtls:peer connection) errmsg)
                (return-from get-request-line nil))
@@ -296,6 +301,7 @@
              (log2:debug "Waiting for request ~d" (incf k))
              (let* ((start-time (get-internal-real-time))
                     (request-line (get-request-line))
+                    ;; ToDo: Create request now?
                     (request nil))
                (log2:trace "<<< ~a" request-line)
                (when (null request-line) (go :finish))

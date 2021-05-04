@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2020-08-06 21:46:18>
+;;; Last Modified <michael 2021-04-24 20:51:04>
 
 (in-package "POLARCL")
 
@@ -141,7 +141,7 @@
 (defmethod set-http-body ((response http-response) (body string))
   (let* ((request (request response))
          (accept-encoding (http-header request :accept-encoding)))
-    (log2:info "Encoding: ~a" accept-encoding)
+    (log2:trace "Encoding: ~a" accept-encoding)
     (cond
       ((search "gzip" accept-encoding)
        (setf (http-header response :|Content-Encoding|)

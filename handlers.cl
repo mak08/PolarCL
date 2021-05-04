@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-03-20 20:50:41>
+;;; Last Modified <michael 2021-05-02 15:50:41>
 
 (in-package "POLARCL")
 
@@ -440,48 +440,6 @@
 (defun post-file (handler request response)
   (declare (ignore handler request response))
   (error "Not implemented yet"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; 2 Calling URL-specified functions
-;;;
-;;; URL-specified functions must be registered with REGISTER-FUNCTION.
-
-(defvar *registered-functions*
-  ())
-
-(defun register-function (symbol)
-  (pushnew symbol *registered-functions*))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; 2-1 'Request Functions'
-;;;
-;;; rfuncs are called with the request & response and return their result by setting
-;;; the response body & other repsonse parameters
-
-(defclass rfunc-handler (handler)
-  ())
-
-(defmethod handle-response ((server http-server) (filter t) (handler rfunc-handler) (request t) (response t))
-  (with-func-from-path (fsym request)
-    (funcall fsym handler request response)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; 2-2 'Query
-;;;
-;;; qfunc receives the query parameters as keyword arguments. The result is returned
-;;; as the response body
-
-(defclass qfunc-handler (handler)
-  ())
-
-(defmethod handle-response ((server http-server) (filter t) (handler qfunc-handler) (request t) (response t))
-  (with-func-from-path (fsym request)
-    (let ((args (loop
-                   :for pair :in (parameters request)
-                   :collect (intern (car pair) :keyword)
-                   :collect (cadr pair))))
-      (setf (http-body response)
-            (apply fsym handler request response args)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 2-3 Dynamic content
