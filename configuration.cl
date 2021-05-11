@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2020-01-24 20:20:14>
+;;; Last Modified <michael 2021-05-09 23:22:06>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo
@@ -90,7 +90,7 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
             handler))))
   (destructuring-bind (&key host (method :get) path prefix)
       request
-    (destructuring-bind (&key static dynamic query-function request-function realm (authentication :basic))
+    (destructuring-bind (&key static dynamic query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
         handler
       (let*
           ((methods (if (atom method) (list method) method))
@@ -105,13 +105,13 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
            (handler
             (cond
               (static
-               `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :realm ,realm))
+               `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :authorizer ,authorizer :realm ,realm))
               (dynamic
-               `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :realm ,realm))
+               `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :authorizer ,authorizer :realm ,realm))
               (query-function
-               `(create-handler 'qfunc-handler :authentication ,authentication :realm ,realm))
+               `(create-handler 'qfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm))
               (request-function
-               `(create-handler 'rfunc-handler :authentication ,authentication :realm ,realm)))))
+               `(create-handler 'rfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm)))))
         `(let ()
            (log2:info "Adding HANDLER ~a ~a" ,filter ,handler)
            (register-handler :filter ,filter :handler ,handler)))))))

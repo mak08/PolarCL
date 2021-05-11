@@ -1,18 +1,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2021
-;;; Last Modified <michael 2021-05-02 17:14:35>
+;;; Last Modified <michael 2021-05-10 00:04:26>
 
 (in-package "POLARCL")
 
-(defun declining-authorizer (handler request registered-function)
-  nil)
+(defun function-authorizer (handler request registered-function)
+  (log2:trace "Authorizing ~a for request ~a" registered-function request)
+  ;; DONT call authenticate, authenticate calls the handler's authorizer!
+  (default-authorizer handler request))
 
-(defun default-authorizer (handler request registered-function)
-  (log2:info "Authorizing ~a for request ~a"  registered-function request)
-  (authenticate handler request))
-
-(defstruct registered-function name symbol (authorizer #'default-authorizer))
+(defstruct registered-function name symbol (authorizer #'function-authorizer))
 
 (defmacro with-func-from-path ((fsym handler request) &body body)
   `(destructuring-bind (fname &rest namespace)
@@ -39,7 +37,7 @@
 
 (defvar *registered-functions-ht* (make-hash-table :test #'equal))
 
-(defun register-function (path &key (symbol (symbol-from-path path)) (authorizer #'default-authorizer))
+(defun register-function (path &key (symbol (symbol-from-path path)) (authorizer #'function-authorizer))
   (setf (gethash path *registered-functions-ht*)
         (make-registered-function :name path
                                   :symbol symbol

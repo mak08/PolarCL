@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-05-02 15:50:41>
+;;; Last Modified <michael 2021-05-10 00:04:30>
 
 (in-package "POLARCL")
 
@@ -103,8 +103,9 @@
    (query :accessor redirector-query :initarg :query)))
 
 (defclass handler (request-processor)
-  ((realm :reader handler-realm :initarg :realm :initform "localhost")
-   (authentication :reader handler-authentication :initarg :authentication :initform nil)))
+  ((realm :reader handler-realm :initarg :realm :initform "root")
+   (authentication :reader handler-authentication :initarg :authentication :initform nil)
+   (authorizer :reader handler-authorizer :initarg :authorizer :initform #'default-authorizer)))
 
 (defmethod print-object ((thing handler) stream)
   (format stream "#<~a>" (type-of thing)))
@@ -242,11 +243,11 @@
 
 (defgeneric create-handler (type
                             &rest args
-                            &key method redirector realm authentication authorization rootdir function contentfn))
+                            &key method redirector realm authentication authorizer rootdir function contentfn))
 
 (defmethod create-handler (type
                            &rest args
-                           &key method redirector realm authentication authorization rootdir function contentfn)
+                           &key method redirector realm authentication authorizer rootdir function contentfn)
   (apply #'make-instance type args))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -343,6 +344,14 @@
     (http-credentials request)))
 
 (defun authenticate (handler request)
+  "Authenticate users defined with the USER server configuration macro.
+Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
+  (funcall (handler-authorizer handler) handler request))
+
+(defun declining-authorizer (handler request registered-function)
+  nil)
+
+(defun default-authorizer (handler request)
   (multiple-value-bind (user password)
       (http-credentials request)
     (when user

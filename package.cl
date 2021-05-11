@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling XMLHttpRequest-style http requests
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2020-02-11 22:07:59>
+;;; Last Modified  <michael 2021-05-10 00:04:56>
 
 (defpackage "POLARCL"
   (:use "COMMON-LISP"
@@ -49,7 +49,12 @@
            "FILE-HANDLER"
            "RFUNC-HANDLER"
            "QFUNC-HANDLER"
+           "HTTP-CREDENTIALS"
            "HTTP-AUTHENTICATED-USER"
+           "AUTHENTICATE"
+           "DECLINING-AUTHORIZER"
+           "DEFAULT-AUTHORIZER"
+           "FUNCTION-AUTHORIZER"
            "MAKE-HTTP-GET"
            "HEADERS"
            "FIELD-NAME"
