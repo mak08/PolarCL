@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-05-10 00:04:30>
+;;; Last Modified <michael 2021-05-16 16:36:23>
 
 (in-package "POLARCL")
 
@@ -40,6 +40,9 @@
 
 (defvar *redirectors* nil)
 (defvar *handlers* nil)
+(defvar *exact-handlers* nil)
+(defvar *prefix-handlers* nil)
+(defvar *regex-handlers* nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Filters (request matching)
@@ -67,9 +70,9 @@
 
 (defclass exact-filter (filter)
   ((prio :initform 0)))
-(defclass regex-filter (filter)
-  ((prio :initform 1)))
 (defclass prefix-filter (filter)
+  ((prio :initform 1)))
+(defclass regex-filter (filter)
   ((prio :initform 2)))
 
 (defgeneric create-filter (type
@@ -114,14 +117,15 @@
 
 (defun register-handler (&key filter handler)
   (let ((dispatcher
-         (make-instance 'dispatcher :filter filter :processor handler)))
-    (push dispatcher *handlers*)
-    (setf *handlers*
-          (sort *handlers*
-                (lambda (h1 h2)
-                  (< (filter-prio h1)
-                     (filter-prio h2)))
-                :key #'dispatcher-filter))))
+          (make-instance 'dispatcher :filter filter :processor handler)))
+    (etypecase filter
+      (exact-filter
+       (push dispatcher *exact-handlers*))
+      (prefix-filter
+       (push dispatcher *prefix-handlers*))
+      (regex-filter
+       (push dispatcher *regex-handlers*)))
+    (push dispatcher *handlers*)))
 
 (defun register-redirector (&key filter redirector)
   (let ((dispatcher
@@ -142,7 +146,9 @@
 (defmethod find-redirector ((connection t) (request t))
   (log2:trace "Searching for redirector ~a ~a" connection request)
   (let ((redirector
-         (find-if (lambda (d) (match-filter (dispatcher-filter d) request)) *redirectors*)))
+          (find-if (lambda (d) (>= (match-filter (dispatcher-filter d) request)
+                                   0))
+                   *redirectors*)))
     (log2:debug "Found redirector ~a" redirector)
     redirector))
 
@@ -152,9 +158,31 @@
   ;; functions, all of which will be called (except for errors)
   (log2:trace "Searching handler for ~a" request)
   (let ((handler 
-         (find-if (lambda (d) (match-filter (dispatcher-filter d) request)) *handlers*)))
-    (log2:debug "Found handler: ~a" handler)
-    handler))
+          (find-if (lambda (d) (>= (match-filter (dispatcher-filter d) request)
+                                   0))
+                   *exact-handlers*)))
+    (when handler
+      (log2:debug "Found handler: ~a" handler)
+      (return-from find-handler handler)))
+  (let ((handler (max-handler *prefix-handlers* request)))
+    (when handler
+      (log2:debug "Found handler: ~a" handler)
+      (return-from find-handler handler)))
+  (let ((handler (max-handler *regex-handlers* request)))
+    (when handler
+      (log2:debug "Found handler: ~a" handler)
+      (return-from find-handler handler))))
+
+(defun max-handler (handlers request)
+  (let ((max-handler nil)
+        (max-match -1))
+    (dolist (handler handlers)
+      (let ((match (match-filter (dispatcher-filter handler) request)))
+        (when (> match max-match)
+          (setf max-handler handler)
+          (setf max-match match))))
+    max-handler))
+   
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Standard request handling
@@ -254,17 +282,20 @@
 ;;; Matching handler to requests
 
 (defun match-filter (filter request)
-  (and (nnmember (http-protocol request) (filter-protocol filter))
-       (nnmember (http-host request) (filter-host filter))
-       (nnmember (http-port request) (filter-port filter))
-       (nnmember (http-method request) (filter-method filter))
-       (match-filter-path filter request)))
+  (or 
+   (and (nnmember (http-protocol request) (filter-protocol filter))
+        (nnmember (http-host request) (filter-host filter))
+        (nnmember (http-port request) (filter-port filter))
+        (nnmember (http-method request) (filter-method filter))
+        (match-filter-path filter request))
+   -1))
 
 (defgeneric match-filter-path (filter request))
 
 (defmethod match-filter-path ((filter exact-filter) request)
   (log2:trace "filter path: ~a request path: ~a" (filter-path filter) (http-path request))
-  (string= (http-path request) (filter-path filter)))
+  (when (string= (http-path request) (filter-path filter))
+    (length (filter-path filter))))
 
 (defmethod match-filter-path ((filter prefix-filter) request)
   (log2:trace "filter path: ~a request path: ~a" (filter-path filter) (http-path request))
@@ -272,9 +303,10 @@
          (length (length prefix))
          (path (http-path request))
          (mismatch (mismatch prefix path)))
-    (or (null mismatch)
-        (and (= mismatch length)
-             (eql (aref path mismatch) #\/)))))
+    (when (or (null mismatch)
+              (and (= mismatch length)
+                   (eql (aref path mismatch) #\/)))
+      length)))
 
 (defmethod match-filter-path ((filter regex-filter) request)
   (log2:trace "filter path: ~a request path: ~a" (filter-path filter) (http-path request))
@@ -346,6 +378,7 @@
 (defun authenticate (handler request)
   "Authenticate users defined with the USER server configuration macro.
 Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
+  (log2:trace "Authorizing with ~a" (handler-authorizer handler))
   (funcall (handler-authorizer handler) handler request))
 
 (defun declining-authorizer (handler request registered-function)
@@ -357,6 +390,7 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
     (when user
       (let* ((credname (credname user (handler-realm handler)))
              (user-info (get-user-info credname)))
+        (log2:info "Authorizing ~a ~a ~a" credname user (handler-realm handler))
         (when user-info
           (string= password
                    (user-hashed-password user-info)))))))
