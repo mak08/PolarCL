@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-05-02 16:09:06>
+;;; Last Modified <michael 2021-05-24 15:33:28>
 
 (in-package "POLARCL")
 
@@ -25,12 +25,12 @@
              `(progn ,@body))))))
 
 
-(defmacro nnmember (item listform &key (test 'string=))
+(defmacro nnmember (item listform &key (test #'string=))
   (let ((listvar (gensym "list-"))
         (resultvar (gensym "result-")))
     `(let* ((,listvar ,listform)
             (,resultvar (or (null ,listvar)
-                            (member ,item ,listvar :test ',test))))
+                            (member ,item ,listvar :test ,test))))
        (log2:trace "Checking ~a in ~a ==> ~a" ,item ,listvar ,resultvar)
        ,resultvar)))
 

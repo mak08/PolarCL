@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-05-16 16:36:23>
+;;; Last Modified <michael 2021-05-24 15:31:13>
 
 (in-package "POLARCL")
 
@@ -219,6 +219,14 @@
                          (default-port scheme)))
                (path (merge-paths (redirector-path redirector)
                                   (http-path request))))
+          (log2:info "~a://~a/~a ==> ~a://~a:~a/~a"
+                     (http-protocol request)
+                     (http-host request)
+                     (http-path request)
+                     scheme
+                     host
+                     port
+                     path)
           (make-redirect-response request
                                   (format () "~a://~a:~a~a" scheme host port path))))))
    ;; 2 - Find handler
@@ -249,7 +257,7 @@
 (defun merge-paths (redirect-path request-path)
   (cond
     ((null redirect-path)
-     (error "Redirector does not specify a location"))
+     request-path)
     ((absolute-path-p redirect-path)
      redirect-path)
     (t
@@ -283,10 +291,10 @@
 
 (defun match-filter (filter request)
   (or 
-   (and (nnmember (http-protocol request) (filter-protocol filter))
-        (nnmember (http-host request) (filter-host filter))
-        (nnmember (http-port request) (filter-port filter))
-        (nnmember (http-method request) (filter-method filter))
+   (and (nnmember (http-protocol request) (filter-protocol filter) :test #'string-equal)
+        (nnmember (http-host request) (filter-host filter) :test #'string-equal)
+        (nnmember (http-port request) (filter-port filter) :test #'string-equal)
+        (nnmember (http-method request) (filter-method filter) :test #'string-equal)
         (match-filter-path filter request))
    -1))
 

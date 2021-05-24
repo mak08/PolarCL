@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-05-09 23:22:06>
+;;; Last Modified <michael 2021-05-24 14:25:28>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo
@@ -65,13 +65,29 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
          (filter
           (cond
             (regex
-             `(create-filter 'regex-filter :method ',methods :protocol ',protocols :host ,host :path (regex:make-regex ,regex)))
+             `(create-filter 'regex-filter :method ',methods
+                                           :protocol ',protocols
+                                           :host ,host
+                                           :port ',port
+                                           :path (regex:make-regex ,regex)))
             (path
-             `(create-filter 'exact-filter :method ',methods :protocol ',protocols :host ,host :path ,path))
+             `(create-filter 'exact-filter :method ',methods
+                                           :protocol ',protocols
+                                           :host ,host
+                                           :port ',port
+                                           :path ,path))
             (prefix
-             `(create-filter 'prefix-filter :method ',methods :protocol ',protocols :host ,host :path ,prefix))
+             `(create-filter 'prefix-filter :method ',methods
+                                            :protocol ',protocols
+                                            :host ,host
+                                            :port ',port
+                                            :path ,prefix))
             (t
-             `(create-filter 'exact-filter :method ',methods :protocol ',protocols :host ,host :path ,prefix))))
+             `(create-filter 'regex-filter :method ',methods
+                                           :protocol ',protocols
+                                           :host ,host
+                                           :port ',port
+                                           :path (regex:make-regex ".*")))))
          (redirector
           `(create-redirector ,@to)))
       `(let ()
