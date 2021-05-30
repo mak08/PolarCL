@@ -39,6 +39,8 @@
     :reader server-port :initarg :port :initform  "8080")
    (hostname
     :reader server-hostname :initarg :hostname :initform "localhost")
+   (database
+    :reader server-database :initarg :database :initform "polarcl.sdb")
    (default-charset
     :reader server-default-charset :initarg :default-charset :initform "UTF-8")
    (keepalive
