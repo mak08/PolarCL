@@ -83,8 +83,7 @@
   (setf *handlers* nil)
   (setf *redirectors* nil)
   (setf *servers* nil)
-  (setf *users* (make-hash-table :test #'equal))
-  (setf *registered-functions* nil))
+  (setf *users* (make-hash-table :test #'equal)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; HTTP Server implementation
@@ -188,7 +187,6 @@
   (bordeaux-threads:with-lock-held (+handler-count-lock+)
     (decf *handler-count*)))
 
-
 (defun server-loop-ondemand (http-server)
   (let ((server (socket-server http-server))
         (thread-id 0))
@@ -204,12 +202,12 @@
                       (sleep 0.5))
                      (t
                       (log2:trace "Accepting a new connection")
-                      (mbedtls:with-server-connection-async ((connection server))
-                        (increase-handler-count)
-                        (log2:debug "Accepted a new connection (now active: ~a)" *handler-count*)
-                        (unwind-protect 
-                             (handle-connection http-server connection)
-                          (decrease-handler-count)))))
+                      (unwind-protect 
+                           (mbedtls:with-server-connection-async ((connection server))
+                             (increase-handler-count)
+                             (log2:debug "Accepted a new connection (now active: ~a/~a)" *handler-count*  (server-max-handlers http-server))
+                             (handle-connection http-server connection))
+                        (decrease-handler-count))))
                  (error (e)
                    (log2:warning "~a" e))))))
       (bordeaux-threads:make-thread #'on-demand-loop% :name "ON-DEMAND-LOOP")
