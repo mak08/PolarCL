@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-05-24 15:31:13>
+;;; Last Modified <michael 2021-06-03 00:30:46>
 
 (in-package "POLARCL")
 
@@ -107,6 +107,7 @@
 
 (defclass handler (request-processor)
   ((realm :reader handler-realm :initarg :realm :initform "root")
+   (database :reader database :initarg :database)
    (authentication :reader handler-authentication :initarg :authentication :initform nil)
    (authorizer :reader handler-authorizer :initarg :authorizer :initform #'default-authorizer)))
 
@@ -387,7 +388,14 @@
   "Authenticate users defined with the USER server configuration macro.
 Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
   (log2:trace "Authorizing with ~a" (handler-authorizer handler))
-  (funcall (handler-authorizer handler) handler request))
+  (cond
+    ((null (authentication-state request))
+     (if (funcall (handler-authorizer handler) handler request)
+         (setf (authentication-state request) :authenticated)
+         (setf (authentication-state request) :unauthenticated)))
+    (t
+     (log2:warning "Skipping authentication of already authenticated request")))
+  (eq (authentication-state request)  :authenticated))
 
 (defun declining-authorizer (handler request registered-function)
   nil)
