@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-04-24 20:51:04>
+;;; Last Modified <michael 2021-06-02 21:24:43>
 
 (in-package "POLARCL")
 
@@ -12,7 +12,8 @@
   ((connection :accessor connection :initarg :connection)
    (port :accessor http-port :initarg :port)
    (headers :accessor headers :initarg :headers :initform ())
-   (body :accessor body :initarg :body :initform "")))
+   (body :accessor body :initarg :body :initform "")
+   (authentication-state :accessor authentication-state :initform nil)))
 
 (defmethod http-protocol ((request http-basic))
   (etypecase (connection request)
