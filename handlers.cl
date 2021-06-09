@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-06-03 00:30:46>
+;;; Last Modified <michael 2021-06-09 20:42:26>
 
 (in-package "POLARCL")
 
@@ -319,7 +319,8 @@
 
 (defmethod match-filter-path ((filter regex-filter) request)
   (log2:trace "filter path: ~a request path: ~a" (filter-path filter) (http-path request))
-  (regex:match-regex (filter-path filter) (http-path request)))
+  (when (regex:match-regex (filter-path filter) (http-path request))
+    (length (http-path request))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Redirection
@@ -390,12 +391,14 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
   (log2:trace "Authorizing with ~a" (handler-authorizer handler))
   (cond
     ((null (authentication-state request))
-     (if (funcall (handler-authorizer handler) handler request)
-         (setf (authentication-state request) :authenticated)
-         (setf (authentication-state request) :unauthenticated)))
+     (let ((authorizer (handler-authorizer handler)))
+       (log2:trace "Using authorizer ~a" authorizer)
+       (if (funcall authorizer handler request)
+           (setf (authentication-state request) :authenticated)
+           (setf (authentication-state request) :unauthenticated))))
     (t
      (log2:warning "Skipping authentication of already authenticated request")))
-  (eq (authentication-state request)  :authenticated))
+  (eq (authentication-state request) :authenticated))
 
 (defun declining-authorizer (handler request registered-function)
   nil)

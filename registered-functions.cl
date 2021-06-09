@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2021
-;;; Last Modified <michael 2021-05-10 00:04:26>
+;;; Last Modified <michael 2021-06-09 01:14:09>
 
 (in-package "POLARCL")
 
@@ -23,7 +23,8 @@
          ((funcall (registered-function-authorizer registered-function)
                    ,handler
                    ,request
-                   registered-function) 
+                   registered-function)
+          (setf (authentication-state ,request) :authenticated)
           (let ((,fsym (registered-function-symbol registered-function)))
             (log2:debug "Executing ~a" ,fsym)
             ,@body))
