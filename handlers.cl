@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-06-17 22:30:15>
+;;; Last Modified <michael 2021-07-29 19:04:06>
 
 (in-package "POLARCL")
 
@@ -464,32 +464,32 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
 (defgeneric realpath (filter handler request))
 
 (defmethod realpath ((filter exact-filter) (handler file-handler) request)
-  (let* ((host (http-host request))
-         (request-path
-          (format () "~{~a~^/~}" (path request))))
+  (let* ((request-path
+           (format () "~{~a~^/~}" (path request)))
+         (filter-path
+           (filter-path filter)))
     (log2:debug "Request path: ~a" request-path)
+    (log2:debug "Filter path: ~a" filter-path)
     (log2:debug "Handler root path: ~a" (handler-rootdir handler))
     (let ((realpath
-           (merge-pathnames
-            (merge-pathnames
-             request-path
-             (parse-namestring (handler-rootdir handler)))
-            *content-root*)))
+            (concatenate 'string
+                         (handler-rootdir handler)
+                         (subseq request-path (length filter-path)))))
       (log2:debug "realpath: ~a" realpath)
       realpath)))
 
 (defmethod realpath ((filter prefix-filter) (handler file-handler) request)
-  (let* ((host (http-host request))
-         (request-path
-          (format () "~{~a~^/~}" (path request))))
+  (let* ((request-path
+           (format () "~{~a~^/~}" (path request)))
+         (filter-path
+           (filter-path filter)))
     (log2:debug "Request path: ~a" request-path)
+    (log2:debug "Filter path: ~a" filter-path)
     (log2:debug "Handler root path: ~a" (handler-rootdir handler))
     (let ((realpath
-           (merge-pathnames
-            (merge-pathnames
-             request-path
-             (parse-namestring (handler-rootdir handler)))
-            *content-root*)))
+            (concatenate 'string
+                         (handler-rootdir handler)
+                         (subseq request-path (length filter-path)))))
       (log2:debug "realpath: ~a" realpath)
       realpath)))
 
