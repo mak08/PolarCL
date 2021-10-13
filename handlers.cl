@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-07-29 19:04:06>
+;;; Last Modified <michael 2021-10-13 23:16:36>
 
 (in-package "POLARCL")
 
@@ -89,7 +89,7 @@
   (apply #'make-instance type args))
 
 (defun create-regex-filter (path)
-  (make-instance 'regex-filter :path (regex:make-regex path)))
+  (make-instance 'regex-filter :path (cl-ppcre:create-scanner path)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Redirectors and Handlers
@@ -319,7 +319,7 @@
 
 (defmethod match-filter-path ((filter regex-filter) request)
   (log2:trace "filter path: ~a request path: ~a" (filter-path filter) (http-path request))
-  (when (regex:match-regex (filter-path filter) (http-path request))
+  (when (cl-ppcre:scan (filter-path filter) (http-path request))
     (length (http-path request))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

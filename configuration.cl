@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-05-24 14:25:28>
+;;; Last Modified <michael 2021-10-13 23:15:40>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo
@@ -69,7 +69,7 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
                                            :protocol ',protocols
                                            :host ,host
                                            :port ',port
-                                           :path (regex:make-regex ,regex)))
+                                           :path (cl-ppcre:create-scanner ,regex)))
             (path
              `(create-filter 'exact-filter :method ',methods
                                            :protocol ',protocols
@@ -87,7 +87,7 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
                                            :protocol ',protocols
                                            :host ,host
                                            :port ',port
-                                           :path (regex:make-regex ".*")))))
+                                           :path (cl-ppcre:create-scanner ".*")))))
          (redirector
           `(create-redirector ,@to)))
       `(let ()
