@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-10-13 23:15:40>
+;;; Last Modified <michael 2021-12-21 18:11:02>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo
@@ -104,7 +104,7 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
             (list handler t))
            (t
             handler))))
-  (destructuring-bind (&key host (method :get) path prefix)
+  (destructuring-bind (&key host (method :get) path prefix regex)
       request
     (destructuring-bind (&key static dynamic query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
         handler
@@ -116,6 +116,8 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
                `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))
               (prefix
                `(create-filter 'prefix-filter :host ,host :method ',methods :path ,prefix))
+              (regex
+               `(create-filter 'regex-filter :host ,host :method ',methods :path ,regex))
               (t
                `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))))
            (handler
