@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2020
-;;; Last Modified <michael 2020-02-14 18:44:29>
+;;; Last Modified <michael 2021-12-29 18:05:43>
 
 ;;; https://tools.ietf.org/html/rfc2109
 
@@ -28,7 +28,6 @@
 (defmethod  get-cookie ((r http-request) name)
   (let ((cookies (find  :|cookie| (headers r) :key #'field-name)))
     (when cookies
-      (setf *r* r)
       (find name (field-value cookies) :key #'cookie-name :test #'string=))))
 
 (defgeneric set-cookie (r name value &key expires max-age options))
