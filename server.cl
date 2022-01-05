@@ -80,8 +80,8 @@
 ;;; - Define variables in a central place, or keep in a structure?
 ;;; - Clarify how to write server-specific configurations
 (defun reset ()
-  (setf *handlers* nil)
   (setf *redirectors* nil)
+  (setf *handlers* nil)
   (setf *servers* nil)
   (setf *users* (make-hash-table :test #'equal)))
 
