@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-12-21 18:11:02>
+;;; Last Modified <michael 2022-01-06 01:52:46>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo
@@ -99,40 +99,40 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
 
 (defmacro handle (&key request handler)
   (let ((handler
-         (cond
-           ((atom handler)
-            (list handler t))
-           (t
-            handler))))
-  (destructuring-bind (&key host (method :get) path prefix regex)
-      request
-    (destructuring-bind (&key static dynamic query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
-        handler
-      (let*
-          ((methods (if (atom method) (list method) method))
-           (filter
-            (cond
-              (path
-               `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))
-              (prefix
-               `(create-filter 'prefix-filter :host ,host :method ',methods :path ,prefix))
-              (regex
-               `(create-filter 'regex-filter :host ,host :method ',methods :path ,regex))
-              (t
-               `(create-filter 'exact-filter :host ,host :method ',methods :path ,path))))
-           (handler
-            (cond
-              (static
-               `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :authorizer ,authorizer :realm ,realm))
-              (dynamic
-               `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :authorizer ,authorizer :realm ,realm))
-              (query-function
-               `(create-handler 'qfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm))
-              (request-function
-               `(create-handler 'rfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm)))))
-        `(let ()
-           (log2:info "Adding HANDLER ~a ~a" ,filter ,handler)
-           (register-handler :filter ,filter :handler ,handler)))))))
+          (cond
+            ((atom handler)
+             (list handler t))
+            (t
+             handler))))
+    (destructuring-bind (&key host (method :get) (port nil) path prefix regex)
+        request
+      (destructuring-bind (&key static dynamic query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
+          handler
+        (let*
+            ((methods (if (atom method) (list method) method))
+             (filter
+               (cond
+                 (path
+                  `(create-filter 'exact-filter :host ,host :port ,port :method ',methods :path ,path))
+                 (prefix
+                  `(create-filter 'prefix-filter :host ,host :port ,port :method ',methods :path ,prefix))
+                 (regex
+                  `(create-filter 'regex-filter :host ,host :port ,port :method ',methods :path ,regex))
+                 (t
+                  `(create-filter 'exact-filter :host ,host :port ,port :method ',methods :path ,path))))
+             (handler
+               (cond
+                 (static
+                  `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                 (dynamic
+                  `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                 (query-function
+                  `(create-handler 'qfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                 (request-function
+                  `(create-handler 'rfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm)))))
+          `(let ()
+             (log2:info "Adding HANDLER ~a ~a" ,filter ,handler)
+             (register-handler :filter ,filter :handler ,handler)))))))
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
