@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-06-02 21:24:43>
+;;; Last Modified <michael 2022-01-08 01:35:17>
 
 (in-package "POLARCL")
 
@@ -109,6 +109,7 @@
   (http-header request ':|host|))
 
 (defun http-path (request)
+  ;; HTTP request paths are :ABSOLUTE, see CREATE-REQUEST
   (format () "/~{~a~^/~}" (path request)))
 
 (defun http-header (r name)

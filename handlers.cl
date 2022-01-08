@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2021-10-13 23:16:36>
+;;; Last Modified <michael 2022-01-08 17:47:47>
 
 (in-package "POLARCL")
 
@@ -437,7 +437,8 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
       (error "Invalid path: ~a" request-path))
     (setf (http-header response :|Content-Type|)
           (get-mime-for-extension (pathname-type path)))
-    (unless (probe-file path)
+    (unless (ignore-errors
+             (probe-file path))
       (log2:trace "Mapped path ~a not found" (truename path))
       (error "File ~a not found" request-path))
     (let ((if-modified-since (http-header request  :|if-modified-since|))
@@ -463,24 +464,10 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
 
 (defgeneric realpath (filter handler request))
 
-(defmethod realpath ((filter exact-filter) (handler file-handler) request)
+(defmethod realpath ((filter filter) (handler file-handler) request)
   (let* ((request-path
-           (format () "~{~a~^/~}" (path request)))
-         (filter-path
-           (filter-path filter)))
-    (log2:debug "Request path: ~a" request-path)
-    (log2:debug "Filter path: ~a" filter-path)
-    (log2:debug "Handler root path: ~a" (handler-rootdir handler))
-    (let ((realpath
-            (concatenate 'string
-                         (handler-rootdir handler)
-                         (subseq request-path (length filter-path)))))
-      (log2:debug "realpath: ~a" realpath)
-      realpath)))
-
-(defmethod realpath ((filter prefix-filter) (handler file-handler) request)
-  (let* ((request-path
-           (format () "~{~a~^/~}" (path request)))
+           ;; DON'T construct path from (path request), use HTTP-PATH!
+           (http-path request))
          (filter-path
            (filter-path filter)))
     (log2:debug "Request path: ~a" request-path)
@@ -495,6 +482,47 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
 
 (defmethod realpath ((filter regex-filter) handler request)
   (error "Cannot determine realpath from ~a" filter))
+
+
+(defun virtualpath (filter handler path)
+  (let ((handler-path (handler-rootdir handler)))
+    (concatenate 'string
+                 (filter-path filter)
+                 (subseq path (length handler-path)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Directories
+
+(defclass directory-handler (file-handler)
+  ())
+
+(defmethod handle-response ((server http-server) (filter t) (handler directory-handler) (request t) (response t))
+  ;; 1 - Determine true path
+  (let* ((request-path
+          (path-string request))
+         (path (realpath filter handler request))
+         (dir (pathname-directory path)))
+    (when (or (find 'absolute dir)
+              (find :up dir))
+      (error "Invalid path: ~a" request-path))
+    (unless (ignore-errors
+             (probe-file path))
+      (log2:info "Mapped path ~a not found" (truename path)))
+    (setf (http-header response :|Content-Type|) "text/html")
+    (setf (http-body response)
+          (concatenate 'string
+                       +html-prefix+
+                       (get-directory filter handler path)
+                       +html-suffix+))))
+
+(defun get-directory (filter handler path)
+  (let ((entries (directory (format nil "~a/*.*" path))))
+    (format nil "<ul>~{~a~%~}~%</ul>"
+            (loop
+              :for e :in entries
+              :for p = (virtualpath filter handler (namestring e))
+              :for f = (subseq p (position #\/ p :from-end t))
+              :collect (format nil "<li><a href=~a>~a</a></li>" p f)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 

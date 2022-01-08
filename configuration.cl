@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-01-06 01:52:46>
+;;; Last Modified <michael 2022-01-08 01:03:21>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo
@@ -106,7 +106,7 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
              handler))))
     (destructuring-bind (&key host (method :get) (port nil) path prefix regex)
         request
-      (destructuring-bind (&key static dynamic query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
+      (destructuring-bind (&key static directory dynamic query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
           handler
         (let*
             ((methods (if (atom method) (list method) method))
@@ -124,6 +124,8 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
                (cond
                  (static
                   `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                 (directory
+                  `(create-handler 'directory-handler :rootdir ,directory :authentication ,authentication :authorizer ,authorizer :realm ,realm))
                  (dynamic
                   `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :authorizer ,authorizer :realm ,realm))
                  (query-function

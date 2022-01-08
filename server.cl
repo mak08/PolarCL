@@ -414,7 +414,9 @@
               (otherwise
                (error "Unsupported HTTP method ~a" method))))
            (url (net.uri:parse-uri query-path))
-           (path (cdr (puri:uri-parsed-path  url)))
+           (path
+             ;; Discard the :ABSOLUTE indicator
+             (cdr (puri:uri-parsed-path url)))
            (parameters (parse-url-query (puri:uri-query url))))
       (setf (path request) path)
       (setf (parameters request) parameters)

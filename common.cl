@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description   
 ;;; Author         Michael Kappert 2019
-;;; Last Modified <michael 2019-06-01 17:49:37>
+;;; Last Modified <michael 2022-01-08 17:47:22>
 
 (in-package "POLARCL")
 
@@ -19,6 +19,15 @@
 
 (defvar *loop-delay* 2
   "Handler loops check for termination with this delay")
+
+
+(defvar +html-prefix+  "<html>
+<body>
+")
+
+(defvar +html-suffix+ "
+</body>
+</html>")
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
