@@ -260,7 +260,7 @@
           (mbedtls:with-server-connection ((conn server))
             (when (and conn (server-running http-server))
               (incf requests)
-              (log2:info "Accepted connection ~d" requests)
+              (log2:trace "Accepted connection ~d" requests)
               (handle-connection http-server conn))))
       (mbedtls:stream-timeout (e)
         (log2:info "Timeout: ~a" e))

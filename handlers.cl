@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-01-08 17:47:47>
+;;; Last Modified <michael 2022-01-09 21:10:54>
 
 (in-package "POLARCL")
 
@@ -397,7 +397,7 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
            (setf (authentication-state request) :authenticated)
            (setf (authentication-state request) :unauthenticated))))
     (t
-     (log2:warning "Skipping authentication of ~a, already authenticated." (http-credentials request))))
+     (log2:trace "Skipping authentication of ~a, already authenticated." (http-credentials request))))
   (eq (authentication-state request) :authenticated))
 
 (defun declining-authorizer (handler request registered-function)
