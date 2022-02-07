@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling XMLHttpRequest-style http requests
 ;;; Author         Michael Kappert 2013
-;;; Last Modified  <michael 2022-01-07 23:47:48>
+;;; Last Modified  <michael 2022-01-30 12:21:53>
 
 (defpackage "POLARCL"
   (:use "COMMON-LISP"
@@ -72,7 +72,6 @@
            "PARSE-URL-QUERY"
            "HTTP-VERSION"
            "GET-MIME-FOR-EXTENSION"
-           "JSON"
            "FORMAT-DATE-IMF"))
 
 ;;; EOF
