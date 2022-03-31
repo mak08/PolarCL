@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2021
-;;; Last Modified <michael 2021-06-09 01:14:09>
+;;; Last Modified <michael 2022-03-07 22:02:48>
 
 (in-package "POLARCL")
 
@@ -24,6 +24,7 @@
                    ,handler
                    ,request
                    registered-function)
+          (log2:info "Authorized ~a using ~a" registered-function (registered-function-authorizer registered-function))
           (setf (authentication-state ,request) :authenticated)
           (let ((,fsym (registered-function-symbol registered-function)))
             (log2:debug "Executing ~a" ,fsym)
@@ -52,10 +53,10 @@
     (find-symbol symbol-name (find-package (string-upcase package-name)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; 2-1 'Request Functions'
+;;; 2-1 'Request functions'
 ;;;
-;;; rfuncs are called with the request & response and return their result by setting
-;;; the response body & other repsonse parameters
+;;; rfuncs are called with the request & response and return their through the
+;;; response body & response headers
 
 (defclass rfunc-handler (handler)
   ())
@@ -65,7 +66,7 @@
     (funcall fsym handler request response)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; 2-2 'Query
+;;; 2-2 'Query functions'
 ;;;
 ;;; qfunc receives the query parameters as keyword arguments. The result is returned
 ;;; as the response body

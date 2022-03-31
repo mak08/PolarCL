@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-01-09 21:10:54>
+;;; Last Modified <michael 2022-03-31 23:34:40>
 
 (in-package "POLARCL")
 
@@ -449,7 +449,7 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
                (> file-write-date (parse-date if-modified-since))))
          (setf (http-header response :|Last-Modified|) (format-date-imf nil file-write-date))
          (handler-case 
-             (with-open-file (f path :element-type '(unsigned-byte 8))
+             (with-open-file (f path :element-type '(unsigned-byte 8) :external-format :utf-8)
                (log2:debug "File ~a length ~d" path (file-length f))
                (let ((buffer (make-array (file-length f) :element-type '(unsigned-byte 8))))
                  (read-sequence buffer f)
@@ -523,6 +523,13 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
               :for p = (virtualpath filter handler (namestring e))
               :for f = (subseq p (position #\/ p :from-end t))
               :collect (format nil "<li><a href=~a>~a</a></li>" p f)))))
+
+(defun ls-directory ()
+  (let ((lines (cdr (cl-utilities:split-sequence #\newline
+                                                 (with-output-to-string (s)
+                                                   (uiop:run-program "ls -l" :output s) s)))))
+    (loop :for line :in lines
+          :collect (cl-utilities:split-sequence #\space line))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 
