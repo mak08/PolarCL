@@ -483,6 +483,7 @@
                       (search "image/png" content-type))
                   (apply #'concatenate '(vector (unsigned-byte 8)) chunks))
                  ((or (search "text/" content-type)
+                      (search "application/json" content-type)
                       (search "application/xml" content-type)
                       (search "application/x-www-form-urlencoded" content-type))
                   (apply #'concatenate 'string
