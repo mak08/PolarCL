@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-03-31 23:34:40>
+;;; Last Modified <michael 2022-05-26 21:02:23>
 
 (in-package "POLARCL")
 
@@ -441,13 +441,13 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
              (probe-file path))
       (log2:trace "Mapped path ~a not found" (truename path))
       (error "File ~a not found" request-path))
-    (let ((if-modified-since (http-header request  :|if-modified-since|))
+    (let ((if-modified-since (http-header request :|if-modified-since|))
           (file-write-date (file-write-date path)))
+      (setf (http-header response :|Last-Modified|) (format-date-imf nil file-write-date))
       (cond
         ((or (null if-modified-since)
              (ignore-errors
                (> file-write-date (parse-date if-modified-since))))
-         (setf (http-header response :|Last-Modified|) (format-date-imf nil file-write-date))
          (handler-case 
              (with-open-file (f path :element-type '(unsigned-byte 8) :external-format :utf-8)
                (log2:debug "File ~a length ~d" path (file-length f))
@@ -458,7 +458,6 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
              (declare (ignore e))
              (error "An error occurred while reading ~a" request-path))))
         (t
-         (setf (http-header response :|Last-Modified|) file-write-date)
          (setf (status-code response) 304)
          (setf (status-text response) "Not Modified"))))))
 
