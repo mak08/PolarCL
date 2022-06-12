@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description   
 ;;; Author         Michael Kappert 2019
-;;; Last Modified <michael 2022-01-08 17:47:22>
+;;; Last Modified <michael 2022-06-10 22:52:11>
 
 (in-package "POLARCL")
 
@@ -20,14 +20,37 @@
 (defvar *loop-delay* 2
   "Handler loops check for termination with this delay")
 
-
-(defvar +html-prefix+  "<html>
-<body>
-")
+(defvar +html-prefix+ "
+<html>
+  <head>
+    <style>
+      td { text-align: right; }
+      tr td: { text-align: right; }
+    </style>
+  </head>
+  <body>")
 
 (defvar +html-suffix+ "
 </body>
 </html>")
+
+(defvar +filelist-prefix+ "
+   <div id=filelist>
+     <table>
+       <thead>
+          <th>Filename</th>
+          <th>Type</th>
+          <th>Size <small>(bytes)</small></th>
+          <th>Date Modified</th>
+        </tr>
+      </thead>
+      <tbody>")
+
+(defvar +filelist-suffix+ "
+      </tbody>
+    </table>
+  </div>")
+
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

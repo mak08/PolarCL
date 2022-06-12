@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-05-26 21:02:23>
+;;; Last Modified <michael 2022-06-12 02:47:24>
 
 (in-package "POLARCL")
 
@@ -425,6 +425,9 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
 (defmethod handle-response ((server http-server) (filter t) (handler file-handler) (request t) (response t))
   ;; 1 - Determine true path
   (log2:trace "GET-FILE: root directory ~a" (handler-rootdir handler))
+  (get-file server filter handler request response))
+
+(defun get-file (server filter handler request response)
   (let* ((request-path
           (path-string request))
          (path (realpath filter handler request))
@@ -500,6 +503,8 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
   (let* ((request-path
           (path-string request))
          (path (realpath filter handler request))
+         (stat (sb-posix:stat path))
+         (ftype (logand polarcl::s_ifmt (sb-posix:stat-mode stat)))
          (dir (pathname-directory path)))
     (when (or (find 'absolute dir)
               (find :up dir))
@@ -507,21 +512,41 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
     (unless (ignore-errors
              (probe-file path))
       (log2:info "Mapped path ~a not found" (truename path)))
-    (setf (http-header response :|Content-Type|) "text/html")
-    (setf (http-body response)
-          (concatenate 'string
-                       +html-prefix+
-                       (get-directory filter handler path)
-                       +html-suffix+))))
+    (cond
+      ((eql ftype polarcl::s_ifreg)
+       (get-file server filter handler request response))
+      ((eql ftype polarcl::s_ifdir)
+       (setf (http-header response :|Content-Type|) "text/html")
+       (setf (http-body response)
+             (concatenate 'string
+                          +html-prefix+
+                          +filelist-prefix+
+                          (get-directory filter handler path)
+                          +filelist-suffix+
+                          +html-suffix+))))))
 
 (defun get-directory (filter handler path)
-  (let ((entries (directory (format nil "~a/*.*" path))))
-    (format nil "<ul>~{~a~%~}~%</ul>"
+  (let ((entries
+          (sort (loop
+                  :for e :in (directory (format nil "~a/*.*" path) :resolve-symlinks nil)
+                  :for s = (sb-posix:stat e)
+                  :for m = (logand (sb-posix:stat-mode s) polarcl::s_ifmt)
+                  :for l = (sb-posix:stat-size s)
+                  :for p = (virtualpath filter handler (namestring e))
+                  :for r = (sb-posix:stat-mtime s)
+                  :collect (list p m l r))
+                #'<=
+                :key #'cadr)))
+    (format nil "~{<tr>~a</tr>~^~%~}"
             (loop
-              :for e :in entries
-              :for p = (virtualpath filter handler (namestring e))
-              :for f = (subseq p (position #\/ p :from-end t))
-              :collect (format nil "<li><a href=~a>~a</a></li>" p f)))))
+              :with row =  "<td><a href=~a>~a</a></td><td>~a</td><td>~:a</td><td>~a</td>"
+              :for (p m l r) :in entries
+              :for ts =  (local-time:unix-to-timestamp r)
+              :for f = (subseq p (1+ (position #\/ p :from-end t)))
+              :when (eql m polarcl::s_ifreg)
+                :collect (format nil row p (subseq p (1+ (position #\/ p :from-end t))) "f" l ts)
+              :when (eql m polarcl::s_ifdir)
+                :collect (format nil row p (subseq p (1+ (position #\/ p :from-end nil :start 1))) "d" l ts)))))
 
 (defun ls-directory ()
   (let ((lines (cdr (cl-utilities:split-sequence #\newline
