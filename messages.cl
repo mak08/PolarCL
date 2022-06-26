@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-06-26 19:49:12>
+;;; Last Modified <michael 2022-06-26 20:59:19>
 
 (in-package "POLARCL")
 
@@ -53,10 +53,11 @@
 (defmethod print-object ((object http-request) stream)
   (print-request stream object :format  "<~a ~a ~a ~a>"))
 
-(defun print-request (stream request &key (format "~a ~a~%~{~a~^~%~}~%--~%~a~%") (max-body-size 20))
+(defun print-request (stream request &key (format "~a ~{/~a~} ~:{~a=~a~}~%~{~a~^~%~}~%--~%~a~%") (max-body-size 20))
   (format stream format
           (http-method request)
           (path request)
+          (parameters request) 
           (headers request)
           (ignore-errors (subseq (body request) 0 (min (length (body request)) max-body-size)))))
 
