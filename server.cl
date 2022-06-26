@@ -319,6 +319,7 @@
                                            (mbedtls:server-port (socket-server http-server))
                                            request-line))
                      (read-request connection request)
+                     (log-request connection request)
                      (let* ((response
                              ;; Request Handling
                              (handle-request http-server connection request)))
@@ -441,6 +442,10 @@
        ;;   This should be deferred, but remember to clear the input if the connection is kept alive. 
        (get-body connection request)))
     request))
+
+(defun log-request (connection request)
+  (log2:trace "~%========================================~%~a~%========================================~%"
+              (print-request nil request :max-body-size 4000000)))
 
 (defun get-body (stream request)
   (let* ((content-type (http-content-type request))

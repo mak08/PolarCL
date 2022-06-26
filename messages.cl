@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-01-08 01:35:17>
+;;; Last Modified <michael 2022-06-26 19:49:12>
 
 (in-package "POLARCL")
 
@@ -24,7 +24,7 @@
   ((field-name :accessor field-name :initarg :name) 
    (field-value :accessor field-value :initarg :value)))
 (defmethod print-object ((object http-header) stream)
-  (format stream "<HEADER ~a: ~a>"
+  (format stream "  ~a: ~a"
           (field-name object)
           (field-value object)))
 
@@ -51,11 +51,14 @@
    (http-version :accessor http-version :initarg :http-version :initform "HTTP/1.1")))
 
 (defmethod print-object ((object http-request) stream)
-  (format stream "<REQUEST ~a ~a ~a ~a>"
-          (http-method object)
-          (path object)
-          (headers object)
-          (ignore-errors (subseq (body object) 0 (min (length (body object)) 20)))))
+  (print-request stream object :format  "<~a ~a ~a ~a>"))
+
+(defun print-request (stream request &key (format "~a ~a~%~{~a~^~%~}~%--~%~a~%") (max-body-size 20))
+  (format stream format
+          (http-method request)
+          (path request)
+          (headers request)
+          (ignore-errors (subseq (body request) 0 (min (length (body request)) max-body-size)))))
 
 (defun path-string (request)
   (format () "/~{~a~^/~}" (path request)))
