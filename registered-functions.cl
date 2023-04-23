@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2021
-;;; Last Modified <michael 2022-03-07 22:02:48>
+;;; Last Modified <michael 2023-04-23 00:21:55>
 
 (in-package "POLARCL")
 
@@ -24,13 +24,13 @@
                    ,handler
                    ,request
                    registered-function)
-          (log2:info "Authorized ~a using ~a" registered-function (registered-function-authorizer registered-function))
+          (log2:trace "Authorized ~a using ~a" registered-function (registered-function-authorizer registered-function))
           (setf (authentication-state ,request) :authenticated)
           (let ((,fsym (registered-function-symbol registered-function)))
             (log2:debug "Executing ~a" ,fsym)
             ,@body))
          (t
-          (error "Unauthorized"))))))
+          (error 'authorization-error :realm (handler-realm handler)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 2 Calling URL-specified functions
@@ -61,7 +61,7 @@
 (defclass rfunc-handler (handler)
   ())
 
-(defmethod handle-response ((server http-server) (filter t) (handler rfunc-handler) (request t) (response t))
+(defmethod handle-response ((server http-server) (filter t) (handler rfunc-handler) (connection t) (request t) (response t))
   (with-func-from-path (fsym handler request)
     (funcall fsym handler request response)))
 
@@ -74,7 +74,7 @@
 (defclass qfunc-handler (handler)
   ())
 
-(defmethod handle-response ((server http-server) (filter t) (handler qfunc-handler) (request t) (response t))
+(defmethod handle-response ((server http-server) (filter t) (handler qfunc-handler) (connection t) (request t) (response t))
   (with-func-from-path (fsym handler request)
     (log2:trace "Executing ~a" fsym) 
     (let ((args (loop

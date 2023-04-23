@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-06-12 02:47:24>
+;;; Last Modified <michael 2023-04-23 00:14:17>
 
 (in-package "POLARCL")
 
@@ -241,9 +241,12 @@
          (log2:info "Authentication failed for ~a" (handler-realm handler))
          (make-authenticate-response handler request))
         (T
-         (let ((response (make-ok-response request)))
-           (handle-response server (dispatcher-filter dispatcher) handler request response)
-           response)))))
+           (handler-case 
+               (let ((response (make-ok-response request)))
+                 (handle-response server (dispatcher-filter dispatcher) handler connection request response)
+                 response)
+             (authorization-error (e)
+               (make-authenticate-response handler request)))))))
    ;; 3 - No handler found. Reply with "Bad Request".
    (t
     (make-http-response :request request :status-code "404" :status-text "Not found"))))
@@ -272,19 +275,19 @@
   (and (>= (length path) 1)
        (char= (aref path 0) #\/)))
 
-(defgeneric handle-response (server filter handler request response))
+(defgeneric handle-response (server filter handler connection request response))
 
-(defmethod handle-response ((server http-server) (filter t) (handler t) (request t) (response t))
+(defmethod handle-response ((server http-server) (filter t) (handler t) (connection t) (request t) (response t))
   (error "Hit basic handler"))
 
 
 (defgeneric create-handler (type
                             &rest args
-                            &key method redirector realm authentication authorizer rootdir function contentfn))
+                            &key method redirector realm authentication authorizer rootdir wsfunction contentfn))
 
 (defmethod create-handler (type
                            &rest args
-                           &key method redirector realm authentication authorizer rootdir function contentfn)
+                           &key method redirector realm authentication authorizer rootdir wsfunction contentfn)
   (apply #'make-instance type args))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -409,7 +412,7 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
     (when user
       (let* ((credname (credname user (handler-realm handler)))
              (user-info (get-user-info credname)))
-        (log2:info "Authorizing ~a ~a ~a" credname user (handler-realm handler))
+        (log2:trace "Authorizing ~a ~a ~a" credname user (handler-realm handler))
         (when user-info
           (string= password
                    (user-hashed-password user-info)))))))
@@ -422,7 +425,7 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
 (defclass file-handler (handler)
   ((rootdir :reader handler-rootdir :initarg :rootdir :initform "/var/www")))
 
-(defmethod handle-response ((server http-server) (filter t) (handler file-handler) (request t) (response t))
+(defmethod handle-response ((server http-server) (filter t) (handler file-handler) (connection t) (request t) (response t))
   ;; 1 - Determine true path
   (log2:trace "GET-FILE: root directory ~a" (handler-rootdir handler))
   (get-file server filter handler request response))
@@ -498,7 +501,7 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
 (defclass directory-handler (file-handler)
   ())
 
-(defmethod handle-response ((server http-server) (filter t) (handler directory-handler) (request t) (response t))
+(defmethod handle-response ((server http-server) (filter t) (handler directory-handler) (connection t) (request t) (response t))
   ;; 1 - Determine true path
   (let* ((request-path
           (path-string request))
@@ -570,7 +573,7 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
 (defclass dynhtml-handler (handler)
   ((contentfn :reader handler-contentfn :initarg :contentfn)))
 
-(defmethod handle-response ((server http-server) (filter t) (handler dynhtml-handler) (request t) (response t))
+(defmethod handle-response ((server http-server) (filter t) (handler dynhtml-handler) (connection t) (request t) (response t))
   ;; Don't set the dynhtml-handler result as response body. If you want the response body automatically set,
   ;; use qfunc handler.
   (funcall (handler-contentfn handler) server handler request response))

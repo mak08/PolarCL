@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-06-26 20:59:19>
+;;; Last Modified <michael 2023-03-11 22:33:09>
 
 (in-package "POLARCL")
 
@@ -33,9 +33,10 @@
    (status-code :accessor status-code :initarg :status-code)
    (status-text :accessor status-text :initarg :status-text)))
 (defmethod print-object ((object http-response) stream)
-  (format stream "<RESPONSE ~a ~a ~a>"
+  (format stream "<RESPONSE ~a ~a ~a ~a>"
           (status-code object)
           (status-text object)
+          (headers object)
           (ignore-errors (subseq (body object) 0 10))))
           
 (defun make-http-response (&rest args &key request host port headers body status-code status-text)
@@ -219,11 +220,11 @@
                                 (make-instance 'http-header :name :|Connection| :value "close")
                                 (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
-(defun make-authenticate-response (handler request)
+(defun make-authenticate-response (handler request &key (realm nil))
   (make-http-response :request request
                       :status-code "401"
                       :status-text "Not Authorized"
-                      :headers (list (make-instance 'http-header :name :|WWW-Authenticate| :value (format () "Basic realm=~a" (handler-realm handler)))
+                      :headers (list (make-instance 'http-header :name :|WWW-Authenticate| :value (format () "Basic realm=~a" (or realm (handler-realm handler))))
                                      (make-instance 'http-header :name :|Access-Control-Allow-Origin| :value "*")
                                      (make-instance 'http-header :name :|Connection| :value "close")
                                      (make-instance 'http-header :name :|Server| :value "PolarCL"))))

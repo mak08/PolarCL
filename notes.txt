@@ -4,14 +4,13 @@ Notes
 
 Dependencies
 ------------
--	Quicklisp modules:
-	-	usocket
-	-	cl-base64
-	-	net.uri
--	C libraries
-	-	mbedTLS
-		=>	Use CMake method to install; requires Perl
-
+-   Quicklisp modules:
+    -   usocket
+    -   cl-base64
+    -   net.uri
+-   C libraries
+    -   mbedTLS
+        =>  Use CMake method to install; requires Perl
 
 Standard request processing
 ---------------------------

@@ -2,7 +2,7 @@
 ;;; Description
 ;;; Author         Michael Kappert
 ;;; Created        22/03/2000 11:15:16
-;;; Last Modified  <michael 2022-06-11 23:31:53>
+;;; Last Modified  <michael 2023-01-28 18:45:26>
 
 (defsystem "polarcl"
   :description "Web server based on mbedtls"
@@ -23,6 +23,7 @@
                ;; (:file "client")
                (:file "mime-types")
                (:file "handlers")
+               (:file "websockets")
                (:file "registered-functions")
                (:file "configuration")))
 

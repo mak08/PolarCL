@@ -88,8 +88,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; HTTP Server implementation
 
+(define-condition authorization-error (error)
+  ((realm :accessor realm :initarg :text))
+  (:report (lambda (c s)
+             (format s "Authentication failed for realm ~a" (realm c)))))
+
 (define-condition missing-server-feature (error)
-  ((text  :accessor text :initarg :text))
+  ((text :accessor text :initarg :text))
   (:report (lambda (c s)
              (format s "Server error: ~a is not implemented" (text c)))))
 
@@ -321,36 +326,37 @@
                      (read-request connection request)
                      (log-request connection request)
                      (let* ((response
-                             ;; Request Handling
-                             (handle-request http-server connection request)))
-                       (log2:debug "Keepalive: ~a from ~a" (http-header response :|Connection|) response)
-                       (let ((keepalive
-                              ;; KeepAlive only if the response says keep-alive.
-                              (and (string= (http-header response :|Connection|) "keep-alive")
+                              ;; Request Handling
+                              (handle-request http-server connection request))
+                            (connection-header (http-header response :|Connection|))
+                            (keepalive
+                              ;; Keep alive only if the response requests it.
+                              (and (string= connection-header "keep-alive")
                                    (keepalive-p request start-time))))
-                         ;; Response post-processing: KeepAlive?
-                         (cond
-                           (keepalive
-                            (setf (http-header response :|Connection|) "Keep-Alive")
-                            (setf (http-header response :|Keep-Alive|) "timeout=5, max=100"))
-                           (t
-                            (setf (http-header response :|Connection|) "close")))
-                         (log2:debug "KeepAlive ~a: request ~a" connection k)
-                         (handler-case
-                             (progn
-                               (write-response connection response)
-                               (log2:info "~a ~a ~a ~a ~a"
-                                          (server-port http-server)
-                                          (status-code response)
-                                          (if keepalive "A" "C")
-                                          (mbedtls:format-ip (mbedtls:peer connection))
-                                          (format-request-info request)))
-                           (mbedtls:stream-write-error (e)
-                             (log2:error "~a Write failed: ~a" (mbedtls:peer connection) e)))
-                         ;; KeepAlive: wait for another request
-                         (when keepalive
-                           (log2:debug "Keep-Alive: ready")
-                           (go :start)))))
+                       (log2:debug "Connection: ~a" connection)
+                       ;; Response post-processing: KeepAlive?
+                       (cond
+                         (keepalive
+                          (setf (http-header response :|Connection|) "Keep-Alive")
+                          (setf (http-header response :|Keep-Alive|) "timeout=5, max=100"))
+                         (t
+                          (setf (http-header response :|Connection|) "close")))
+                       (log2:debug "KeepAlive ~a: request ~a" connection k)
+                       (handler-case
+                           (progn
+                             (write-response connection response)
+                             (log2:info "~a ~a ~a ~a ~a"
+                                        (server-port http-server)
+                                        (status-code response)
+                                        (if keepalive "A" "C")
+                                        (mbedtls:format-ip (mbedtls:peer connection))
+                                        (format-request-info request)))
+                         (mbedtls:stream-write-error (e)
+                           (log2:error "~a Write failed: ~a" (mbedtls:peer connection) e)))
+                       ;; KeepAlive: wait for another request
+                       (when keepalive
+                         (log2:debug "Keep-Alive: ready")
+                         (go :start))))
                  (error (e)
                    (log2:warning "~a Caught error: ~a" (mbedtls:peer connection) e)
                    (handler-case

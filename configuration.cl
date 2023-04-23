@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2022-01-08 01:03:21>
+;;; Last Modified <michael 2023-01-28 18:48:38>
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ToDo
@@ -106,7 +106,7 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
              handler))))
     (destructuring-bind (&key host (method :get) (port nil) path prefix regex)
         request
-      (destructuring-bind (&key static directory dynamic query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
+      (destructuring-bind (&key static directory dynamic websocket query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
           handler
         (let*
             ((methods (if (atom method) (list method) method))
@@ -131,7 +131,9 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
                  (query-function
                   `(create-handler 'qfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm))
                  (request-function
-                  `(create-handler 'rfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm)))))
+                  `(create-handler 'rfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                 (websocket
+                  `(create-handler 'websocket-handler :wsfunction ,websocket :authentication ,authentication :authorizer ,authorizer :realm ,realm)))))
           `(let ()
              (log2:info "Adding HANDLER ~a ~a" ,filter ,handler)
              (register-handler :filter ,filter :handler ,handler)))))))
