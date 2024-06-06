@@ -158,7 +158,7 @@
        (bordeaux-threads:make-thread #'run))
       (t
        (run)))))
-  
+
 (defmethod create-server ((server http-server))
   (mbedtls:create-plain-socket-server (server-hostname server)
                                       (server-port server)
@@ -217,8 +217,7 @@
                    (log2:info "Timeout: ~a" e))
                  (error (e)
                    (log2:error "~a" e))
-                 (condition (e)
-                   (log2:error "Unexpected non-local transfer on ~a" e))))))
+                 ))))
       (bordeaux-threads:make-thread #'on-demand-loop% :name "ON-DEMAND-LOOP")
       (do ()
           ((not (server-running http-server))
@@ -235,7 +234,7 @@
 (defun server-loop-pooled (http-server)
   (let* ((server (socket-server http-server))
          (threads
-          (loop
+           (loop
              :for k :below (server-max-handlers http-server)
              :for name = (format () "handler-~a:~a-~d"
                                  (server-hostname http-server)
@@ -271,8 +270,7 @@
         (log2:info "Timeout: ~a" e))
       (error (e)
         (log2:error "Caught error: ~a" e))
-      (condition (e)
-        (log2:error "Unexpected non-local transfer on ~a" e))))
+      ))
   (log2:info "Accept loop finished, thread exiting"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -388,7 +386,7 @@
                    :name key
                    :value (case key
                             (:|cookie|
-                              (parse-cookies value))
+                             (parse-cookies value))
                             (t
                              (string-left-trim " " value))))))
 
@@ -396,10 +394,10 @@
   ;; Fixme: handle escaped chars =,& ?
   (when (stringp string)
     (loop
-       :for pair :in (cl-utilities:split-sequence #\& string)
-       :for sep = (position #\= pair)
-       :collect (list (subseq pair 0 sep)
-                      (when sep (subseq pair (1+ sep)))))))
+      :for pair :in (cl-utilities:split-sequence #\& string)
+      :for sep = (position #\= pair)
+      :collect (list (subseq pair 0 sep)
+                     (when sep (subseq pair (1+ sep)))))))
 
 (defun parse-request-line (line)
   (destructuring-bind (&optional (method "INVALID") (query-path "") (http-version "HTTP/1.1"))
@@ -412,14 +410,14 @@
   (multiple-value-bind (method query-path http-version)
       (parse-request-line line)
     (let* ((request
-            (case (intern (string-upcase method) :keyword)
-              (:get (make-http-get :connection connection :port port))
-              (:head (make-http-head :connection connection :port port))
-              (:post (make-http-post :connection connection :port port))
-              (:put (make-http-put :connection connection :port port))
-              (:options (make-http-options :connection connection :port port))
-              (otherwise
-               (error "Unsupported HTTP method ~a" method))))
+             (case (intern (string-upcase method) :keyword)
+               (:get (make-http-get :connection connection :port port))
+               (:head (make-http-head :connection connection :port port))
+               (:post (make-http-post :connection connection :port port))
+               (:put (make-http-put :connection connection :port port))
+               (:options (make-http-options :connection connection :port port))
+               (otherwise
+                (error "Unsupported HTTP method ~a" method))))
            (url (net.uri:parse-uri query-path))
            (path
              ;; Discard the :ABSOLUTE indicator
@@ -432,8 +430,8 @@
 
 (defun read-request (connection request)
   (let* ((headers
-          ;; Read header lines
-          (loop
+           ;; Read header lines
+           (loop
              :for line = (mbedtls:get-line connection)
              :while (and line
                          ;; Headers are terminated by an empty line
@@ -465,44 +463,44 @@
               (content-encoding (http-content-encoding request))
               (content-charset (http-charset request))
               (chunks
-               (cond
-                 (content-length
-                  (let* ((octets
-                          (mbedtls:get-octets stream content-length))
-                         (chunk (cond
-                                  ((null content-encoding)
-                                   octets)
-                                  ((string= content-encoding "gzip")
-                                   (zlib:gunzip octets))
-                                  (t
-                                   (error "Content encoding ~a not supported" content-encoding)))))
-                    (list chunk)))
-                 ((search "chunked" transfer-encoding)
-                  ;; http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6
-                  (do ((chunk-size (get-chunk-size stream) (get-chunk-size stream))
-                       (body ()))
-                      ((= chunk-size 0)
-                       (nreverse body))
-                    (push (mbedtls:get-octets stream chunk-size) body)
-                    (mbedtls:get-octets stream 2)))
-                 (t
-                  (log2:warning "No Content-length protocol, reading until EOS")
-                  (list (mbedtls:get-octets stream nil)))))
+                (cond
+                  (content-length
+                   (let* ((octets
+                            (mbedtls:get-octets stream content-length))
+                          (chunk (cond
+                                   ((null content-encoding)
+                                    octets)
+                                   ((string= content-encoding "gzip")
+                                    (zlib:gunzip octets))
+                                   (t
+                                    (error "Content encoding ~a not supported" content-encoding)))))
+                     (list chunk)))
+                  ((search "chunked" transfer-encoding)
+                   ;; http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6
+                   (do ((chunk-size (get-chunk-size stream) (get-chunk-size stream))
+                        (body ()))
+                       ((= chunk-size 0)
+                        (nreverse body))
+                     (push (mbedtls:get-octets stream chunk-size) body)
+                     (mbedtls:get-octets stream 2)))
+                  (t
+                   (log2:warning "No Content-length protocol, reading until EOS")
+                   (list (mbedtls:get-octets stream nil)))))
               (body
-               (cond
-                 ((or (search "application/octet-stream" content-type)
-                      (search "image/png" content-type))
-                  (apply #'concatenate '(vector (unsigned-byte 8)) chunks))
-                 ((or (search "text/" content-type)
-                      (search "application/json" content-type)
-                      (search "application/xml" content-type)
-                      (search "application/x-www-form-urlencoded" content-type))
-                  (apply #'concatenate 'string
-                         (mapcar (lambda (chunk)
-                                   (octets-to-string chunk :encoding content-charset))
-                                 chunks)))
-                 (t
-                  (error "Unknown content type ~a" content-type)))))
+                (cond
+                  ((or (search "application/octet-stream" content-type)
+                       (search "image/png" content-type))
+                   (apply #'concatenate '(vector (unsigned-byte 8)) chunks))
+                  ((or (search "text/" content-type)
+                       (search "application/json" content-type)
+                       (search "application/xml" content-type)
+                       (search "application/x-www-form-urlencoded" content-type))
+                   (apply #'concatenate 'string
+                          (mapcar (lambda (chunk)
+                                    (octets-to-string chunk :encoding content-charset))
+                                  chunks)))
+                  (t
+                   (error "Unknown content type ~a" content-type)))))
          (setf (body request) body))))))
 
 (defun get-chunk-size (stream)
@@ -534,20 +532,20 @@
   (log2:trace ">>> Body: ~a" (subseq body 0 (min 20 (length body))))
   (etypecase body
     (string
-      (mbedtls:write-to-stream stream (string-to-octets body)))
+     (mbedtls:write-to-stream stream (string-to-octets body)))
     (vector
-      (mbedtls:write-to-stream stream body)))
+     (mbedtls:write-to-stream stream body)))
   (log2:trace ">>> Body: wrote ~a chars/bytes" (length body)))
 
 (defun write-headers (headers stream)
   (loop
-     :for header :in headers
-     :do (case (field-name header)
-           (:|Cookie|
-             (error "Use Set-Cookie instead of Cookie in HTTP response"))
-           (t
-            ;; This relies on print-object to print cookies
-            (write-message-line stream "~a: ~a" (field-name header) (field-value header))))))
+    :for header :in headers
+    :do (case (field-name header)
+          (:|Cookie|
+           (error "Use Set-Cookie instead of Cookie in HTTP response"))
+          (t
+           ;; This relies on print-object to print cookies
+           (write-message-line stream "~a: ~a" (field-name header) (field-value header))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Aux functions
