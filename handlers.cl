@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2023-04-23 00:14:17>
+;;; Last Modified <michael 2024-06-29 23:32:29>
 
 (in-package "POLARCL")
 
@@ -238,7 +238,7 @@
         ;; Authentication
         ((and (handler-authentication handler)
               (not (authenticate handler request)))
-         (log2:info "Authentication failed for ~a" (handler-realm handler))
+         (log2:info "Authentication failed for ~a ~a" (handler-realm handler) request)
          (make-authenticate-response handler request))
         (T
            (handler-case 
