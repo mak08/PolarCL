@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    Handling HTTP Requests
 ;;; Author         Michael Kappert 2016
-;;; Last Modified <michael 2024-06-29 23:32:29>
+;;; Last Modified <michael 2025-09-05 21:51:19>
 
 (in-package "POLARCL")
 
@@ -199,57 +199,61 @@
 
 (defmethod handle-request ((server http-server) (connection t) (request t))
   (log2:debug "~a ~a ~a~%"
-             (server-port server)
-             (mbedtls:format-ip (mbedtls:peer connection))
-             (format-request-info request))
-  (condlet
-   ;; 1 - Check if the request is redirected
-   ((dispatcher (find-redirector connection request))
-    (let ((redirector (dispatcher-processor dispatcher)))
-      (log2:trace "Redirecting request ~a using ~a" request redirector)
-      (destructuring-bind (request-host &optional request-port)
-          (cl-utilities:split-sequence #\: (http-host request))
-        (let* ((scheme (or (redirector-scheme redirector)
-                           (http-protocol request)
-                           "http"))
-               (host (or (redirector-host redirector)
-                         request-host
-                         "localhost"))
-               (port (or (redirector-port redirector)
-                         request-port
-                         (default-port scheme)))
-               (path (merge-paths (redirector-path redirector)
-                                  (http-path request))))
-          (log2:info "~a://~a/~a ==> ~a://~a:~a/~a"
-                     (http-protocol request)
-                     (http-host request)
-                     (http-path request)
-                     scheme
-                     host
-                     port
-                     path)
-          (make-redirect-response request
-                                  (format () "~a://~a:~a~a" scheme host port path))))))
-   ;; 2 - Find handler
-   ((dispatcher (find-handler connection request))
-    (log2:trace "Handling request ~a using ~a" request dispatcher)
-    (let ((handler (dispatcher-processor dispatcher)))
-      (cond
-        ;; Authentication
-        ((and (handler-authentication handler)
-              (not (authenticate handler request)))
-         (log2:info "Authentication failed for ~a ~a" (handler-realm handler) request)
-         (make-authenticate-response handler request))
-        (T
-           (handler-case 
-               (let ((response (make-ok-response request)))
-                 (handle-response server (dispatcher-filter dispatcher) handler connection request response)
-                 response)
-             (authorization-error (e)
-               (make-authenticate-response handler request)))))))
-   ;; 3 - No handler found. Reply with "Bad Request".
-   (t
-    (make-http-response :request request :status-code "404" :status-text "Not found"))))
+              (server-port server)
+              (mbedtls:format-ip (mbedtls:peer connection))
+              (format-request-info request))
+  (handler-case
+      (condlet
+       ;; 1 - Check if the request is redirected
+       ((dispatcher (find-redirector connection request))
+        (let ((redirector (dispatcher-processor dispatcher)))
+          (log2:trace "Redirecting request ~a using ~a" request redirector)
+          (destructuring-bind (request-host &optional request-port)
+              (cl-utilities:split-sequence #\: (http-host request))
+            (let* ((scheme (or (redirector-scheme redirector)
+                               (http-protocol request)
+                               "http"))
+                   (host (or (redirector-host redirector)
+                             request-host
+                             "localhost"))
+                   (port (or (redirector-port redirector)
+                             request-port
+                             (default-port scheme)))
+                   (path (merge-paths (redirector-path redirector)
+                                      (http-path request))))
+              (log2:info "~a://~a/~a ==> ~a://~a:~a/~a"
+                         (http-protocol request)
+                         (http-host request)
+                         (http-path request)
+                         scheme
+                         host
+                         port
+                         path)
+              (make-redirect-response request
+                                      (format () "~a://~a:~a~a" scheme host port path))))))
+       ;; 2 - Find handler
+       ((dispatcher (find-handler connection request))
+        (log2:trace "Handling request ~a using ~a" request dispatcher)
+        (let ((handler (dispatcher-processor dispatcher)))
+          (cond
+            ;; Authentication
+            ((and (handler-authentication handler)
+                  (not (authenticate handler request)))
+             (log2:info "Authentication failed for ~a peer ~a request ~a" (handler-realm handler) (mbedtls:peer connection) request)
+             (make-authenticate-response handler request))
+            (T
+             (handler-case 
+                 (let ((response (make-ok-response request)))
+                   (handle-response server (dispatcher-filter dispatcher) handler connection request response)
+                   response)
+               (authorization-error (e)
+                 (make-authenticate-response handler request)))))))
+       ;; 3 - No handler found. Reply with "Bad Request".
+       (t
+        (make-http-response :request request :status-code "404" :status-text "Not found")))
+    (error (e)
+      (log2:error "Caught ~a while handling ~a" e request)
+      (make-error-response request :body (format nil "~a" e)))))
 
 (defun default-port (scheme)
   (cond
@@ -506,7 +510,10 @@ Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
   (let* ((request-path
           (path-string request))
          (path (realpath filter handler request))
-         (stat (sb-posix:stat path))
+         (stat (handler-case
+                   (sb-posix:stat path)
+                 (error (e)
+                   (error "Cannot stat ~a" path))))
          (ftype (logand polarcl::s_ifmt (sb-posix:stat-mode stat)))
          (dir (pathname-directory path)))
     (when (or (find 'absolute dir)
