@@ -529,13 +529,18 @@
     (mbedtls:write-to-stream stream #(13 10))))
 
 (defun write-body (stream body)
-  (log2:trace ">>> Body: ~a" (subseq body 0 (min 20 (length body))))
-  (etypecase body
-    (string
-     (mbedtls:write-to-stream stream (string-to-octets body)))
-    (vector
-     (mbedtls:write-to-stream stream body)))
-  (log2:trace ">>> Body: wrote ~a chars/bytes" (length body)))
+  "Verify the actual byte count returned by the writer before closing the response."
+  (let* ((bytes (etypecase body
+                  (string (string-to-octets body))
+                  (vector body)))
+         (expected (length bytes))
+         (written (mbedtls:write-to-stream stream bytes)))
+    (unless (eql written expected)
+      (error 'mbedtls:stream-write-error :peer stream :location "HTTP response body"
+             :message (format nil "Writer returned ~s of ~d bytes" written expected)))
+    (when (> expected 65536)
+      (log2:info "HTTP response body write completed: ~d of ~d bytes" written expected))
+    written))
 
 (defun write-headers (headers stream)
   (loop

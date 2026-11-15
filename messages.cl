@@ -150,6 +150,9 @@
          (accept-encoding (http-header request :accept-encoding)))
     (log2:trace "Encoding: ~a" accept-encoding)
     (cond
+      ;; A handler can opt out of automatic compression for this response.
+      ((string-equal (http-header response :|Content-Encoding|) "identity")
+       (setf (body response) body))
       ((search "gzip" accept-encoding)
        (setf (http-header response :|Content-Encoding|)
              "gzip")
@@ -172,6 +175,9 @@
          (accept-encoding (http-header request :accept-encoding)))
     (log2:trace "Encoding: ~a" accept-encoding)
     (cond
+      ;; A handler can opt out of automatic compression for this response.
+      ((string-equal (http-header response :|Content-Encoding|) "identity")
+       (setf (body response) body))
       ((search "gzip" accept-encoding)
        (setf (http-header response :|Content-Encoding|)
              "gzip")
