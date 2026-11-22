@@ -12,7 +12,7 @@
 
 (defstruct registered-function name symbol (authorizer #'function-authorizer))
 
-(defmacro with-func-from-path ((fsym handler request) &body body)
+(defmacro with-func-from-path ((fsym handler request response) &body body)
   `(destructuring-bind (fname &rest namespace)
        (reverse (path ,request))
      (let ((registered-function (gethash fname *registered-functions-ht*)))
@@ -30,7 +30,13 @@
             (log2:debug "Executing ~a" ,fsym)
             ,@body))
          (t
-          (error 'authorization-error :realm (handler-realm handler)))))))
+          ;; Denial is a response, not an application error. Do not catch errors
+          ;; from either the authorizer or the registered function as denials.
+          (let ((challenge (make-authenticate-response ,handler ,request)))
+            (setf (status-code ,response) (status-code challenge)
+                  (status-text ,response) (status-text challenge)
+                  (headers ,response) (headers challenge)
+                  (body ,response) (body challenge))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 2 Calling URL-specified functions
@@ -62,7 +68,7 @@
   ())
 
 (defmethod handle-response ((server http-server) (filter t) (handler rfunc-handler) (connection t) (request t) (response t))
-  (with-func-from-path (fsym handler request)
+  (with-func-from-path (fsym handler request response)
     (funcall fsym handler request response)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -75,7 +81,7 @@
   ())
 
 (defmethod handle-response ((server http-server) (filter t) (handler qfunc-handler) (connection t) (request t) (response t))
-  (with-func-from-path (fsym handler request)
+  (with-func-from-path (fsym handler request response)
     (log2:trace "Executing ~a" fsym) 
     (let ((args (loop
                    :for pair :in (parameters request)

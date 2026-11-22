@@ -242,12 +242,9 @@
              (log2:info "Authentication failed for ~a peer ~a request ~a" (handler-realm handler) (mbedtls:peer connection) request)
              (make-authenticate-response handler request))
             (T
-             (handler-case 
-                 (let ((response (make-ok-response request)))
-                   (handle-response server (dispatcher-filter dispatcher) handler connection request response)
-                   response)
-               (authorization-error (e)
-                 (make-authenticate-response handler request)))))))
+             (let ((response (make-ok-response request)))
+               (handle-response server (dispatcher-filter dispatcher) handler connection request response)
+               response)))))
        ;; 3 - No handler found. Reply with "Bad Request".
        (t
         (make-http-response :request request :status-code "404" :status-text "Not found")))

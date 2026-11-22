@@ -1,6 +1,21 @@
 # PolarCL
 A web server based on mbedTLS
 
+## Documentation
+
+See the [external API and configuration manual](Manual.md) for server options,
+HTTP/HTTPS setup, routing, authentication, request/response APIs, cookies and
+implementation limitations. The [runnable example configuration](examples/api-config.cl)
+demonstrates dynamic content, registered functions, POST bodies, static files and
+redirects, with corresponding curl commands in the manual.
+
+```lisp
+(ql:quickload "polarcl")
+(polarcl:load-configuration "/absolute/path/to/PolarCL/examples/api-config.cl")
+;; Stop when finished:
+(polarcl:stop-all-servers)
+```
+
 ## Description
 PolarCL is a web server based on [mbedTLS](https://www.mbed.com/en/technologies/security/mbed-tls/) (formerly known as PolarSSL). It is still work in progress.
 PolarCL currently supports
@@ -33,10 +48,15 @@ Furthermore, PolarCL supports server-side programming in Common Lisp
    * local-time
 * Github projects
    * cl-mbedtls
-   * regex
+   * makros
    * zlib
 
+The system also declares cl-ppcre; see [polarcl.asd](polarcl.asd) and the manual
+for dependency and native-library setup details.
 
-# Bugs:
-  *	POSTing an empty body results in timeout
-  *	Client hangs when connection is kept alive?	
+
+## Limitations
+
+See the manual for current limitations, including PUT/HEAD handling, UTF-8
+response lengths and experimental WebSocket support.
+POST requests with an explicit `Content-Length: 0` are handled by the current code.

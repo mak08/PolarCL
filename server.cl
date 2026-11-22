@@ -80,16 +80,21 @@
 ;;; - Define variables in a central place, or keep in a structure?
 ;;; - Clarify how to write server-specific configurations
 (defun reset ()
+  "Clear all server configuration registries after the servers have been stopped."
   (setf *redirectors* nil)
   (setf *handlers* nil)
+  (setf *exact-handlers* nil)
+  (setf *prefix-handlers* nil)
+  (setf *regex-handlers* nil)
   (setf *servers* nil)
-  (setf *users* (make-hash-table :test #'equal)))
+  (setf *users* (make-hash-table :test #'equal))
+  (setf *registered-functions-ht* (make-hash-table :test #'equal)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; HTTP Server implementation
 
 (define-condition authorization-error (error)
-  ((realm :accessor realm :initarg :text))
+  ((realm :accessor realm :initarg :realm :initarg :text))
   (:report (lambda (c s)
              (format s "Authentication failed for realm ~a" (realm c)))))
 
