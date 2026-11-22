@@ -338,13 +338,17 @@ using `handle`, whose default method is GET.
 
 Response strings/vectors may be compressed based on Accept-Encoding. Set
 `Content-Encoding` to `"identity"` **before** setting the body to opt out.
-Uncompressed strings currently calculate Content-Length in characters, which is
-incorrect for non-ASCII UTF-8. Use UTF-8 octets for such responses:
+Strings are sent as UTF-8, and Content-Length counts encoded bytes, not characters
+(for example, `"Grüße"` is 7 bytes). Compressed responses count the compressed
+bytes. HEAD reports the same length as GET while sending no body. These rules
+follow [RFC 9110 §8.6](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6).
+Strings remain strings through `http-body` when compression is not applied;
+applications can also supply an octet vector directly.
 
 ```lisp
 (setf (polarcl:http-header response :|Content-Type|) "text/plain; charset=utf-8"
       (polarcl:http-header response :|Content-Encoding|) "identity"
-      (polarcl:http-body response) (babel:string-to-octets "Grüße" :encoding :utf-8))
+      (polarcl:http-body response) "Grüße")
 ```
 
 `get-cookie (request name)` returns a cookie object or NIL. Read or set its

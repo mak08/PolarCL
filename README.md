@@ -57,6 +57,6 @@ for dependency and native-library setup details.
 
 ## Limitations
 
-See the manual for current limitations, including PUT body handling, UTF-8
-response lengths and experimental WebSocket support.
+See the manual for current limitations, including PUT body handling and
+experimental WebSocket support.
 POST requests with an explicit `Content-Length: 0` are handled by the current code.

@@ -541,7 +541,7 @@
   (let* ((bytes
            (etypecase body
              (string
-              (string-to-octets body))
+              (string-to-octets body :encoding :utf-8))
              (vector
               body)))
          (expected

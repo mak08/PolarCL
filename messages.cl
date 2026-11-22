@@ -157,7 +157,7 @@
        (setf (http-header response :|Content-Encoding|)
              "gzip")
        (setf (body response)
-             (zlib:gzip body)))
+             (zlib:gzip-bytes (string-to-octets body :encoding :utf-8))))
       ((search "compress" accept-encoding)
        (setf (http-header response :|Content-Encoding|)
              "compress")
@@ -167,7 +167,11 @@
        (setf (body response)
              body)))
     (setf (http-header response :|Content-Length|)
-          (length (body response))))
+          ;; Count the encoded representation, not Lisp characters. Compressed
+          ;; bodies are already octet vectors; retain strings for callers.
+          (if (stringp (body response))
+              (babel:string-size-in-octets (body response) :encoding :utf-8)
+              (length (body response)))))
   response)
 
 (defmethod set-http-body ((response http-response) (body vector))
