@@ -27,8 +27,8 @@ With PolarCL and its dependencies available to ASDF:
 (asdf:test-system "polarcl/tests")
 ```
 
-Both commands run the configuration/authorization and HTTP response regression
-suites, including HEAD, UTF-8 lengths and gzip. Tests use captured output rather
+Both commands run the configuration/authorization, HTTP response and request
+charset regression suites, including HEAD, UTF-8 lengths and gzip. Tests use captured output rather
 than network listeners and isolate configuration registries. Assertion failures
 signal errors. Loading `polarcl` alone does not load or run the tests.
 

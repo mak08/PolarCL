@@ -273,23 +273,22 @@
 (defun http-content-type (response)
   (http-header response :|content-type|))
 
-(defparameter *default-charset* "utf-8")
-
 (defun http-charset (request)
-  (let* ((content-type (http-content-type request))
-         (encoding (if (null content-type)
-                       *default-charset*
-                       (or
-                        (cadr (assoc "charset"
-                                     (mapcar (lambda (e)
-                                               (cl-utilities:split-sequence #\= e))
-                                             (cl-utilities:split-sequence #\; content-type))
-                                     :key #'strip-name
-                                     :test #'string=))
-                        *default-charset*))))
-    (intern
-     (string-upcase (strip-name encoding))
-     :keyword)))
+  "Use the declared Content-Type charset, or UTF-8 when none is specified."
+  (let ((content-type (http-content-type request))
+        (whitespace '(#\Space #\Tab)))
+    (dolist (parameter (cdr (cl-utilities:split-sequence #\; (or content-type "")))
+                       :utf-8)
+      (let ((separator (position #\= parameter)))
+        (when (and separator
+                   (string-equal "charset"
+                                 (string-trim whitespace (subseq parameter 0 separator))))
+          (let ((encoding (string-trim whitespace (subseq parameter (1+ separator)))))
+            (when (and (>= (length encoding) 2)
+                       (char= (char encoding 0) #\")
+                       (char= (char encoding (1- (length encoding))) #\"))
+              (setf encoding (subseq encoding 1 (1- (length encoding)))))
+            (return (intern (string-upcase encoding) :keyword))))))))
 
 
 ;;; EOF

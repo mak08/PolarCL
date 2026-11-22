@@ -41,8 +41,6 @@
     :reader server-hostname :initarg :hostname :initform "localhost")
    (database
     :reader server-database :initarg :database :initform "polarcl.sdb")
-   (default-charset
-    :reader server-default-charset :initarg :default-charset :initform "UTF-8")
    (keepalive
     :reader server-keepalive :initarg :keepalive :initform 10000
     :documentation "How long a connection waits for the next request")
@@ -500,10 +498,10 @@
                        (search "application/json" content-type)
                        (search "application/xml" content-type)
                        (search "application/x-www-form-urlencoded" content-type))
-                   (apply #'concatenate 'string
-                          (mapcar (lambda (chunk)
-                                    (octets-to-string chunk :encoding content-charset))
-                                  chunks)))
+                   ;; Transfer chunks can split a multibyte character.
+                   (octets-to-string
+                    (apply #'concatenate '(vector (unsigned-byte 8)) chunks)
+                    :encoding content-charset))
                   (t
                    (error "Unknown content type ~a" content-type)))))
          (setf (body request) body))))))

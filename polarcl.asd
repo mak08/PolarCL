@@ -34,11 +34,13 @@
   :depends-on ("polarcl")
   :serial t
   :components ((:file "tests/configuration-tests")
-               (:file "tests/head-response-tests"))
+               (:file "tests/head-response-tests")
+               (:file "tests/request-charset-tests"))
   :perform (test-op (operation system)
              (declare (ignore operation system))
              (uiop:symbol-call :polarcl-tests :run-tests)
-             (uiop:symbol-call :polarcl-head-tests :run-tests)))
+             (uiop:symbol-call :polarcl-head-tests :run-tests)
+             (uiop:symbol-call :polarcl-charset-tests :run-tests)))
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

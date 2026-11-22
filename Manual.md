@@ -107,7 +107,6 @@ thread alone does not establish successful binding.
 | `:debug-level` | `0` | Passed to cl-mbedtls. |
 | `:log-level` | `1` | Stored, but not applied by the server implementation. |
 | `:database` | `"polarcl.sdb"` | Stored; not used for the built-in user registry. |
-| `:default-charset` | `"UTF-8"` | Stored; request decoding instead uses the internal default `"utf-8"`. |
 
 Keep-alive requires an explicit request `Connection: keep-alive` and an eligible
 response. The emitted `Keep-Alive: timeout=5, max=100` header is hard-coded,
@@ -327,6 +326,12 @@ Incoming header names are lowercase keywords (`:|content-type|`); use convention
 case-sensitive response keywords (`:|Content-Type|`). Initial successful responses
 have status 200, `Content-Type: text/html`, `Access-Control-Allow-Origin: *`,
 `Connection: keep-alive`, and `Server: PolarCL`. Set the body explicitly.
+
+The unused server option `:default-charset` has been removed. Text request bodies
+use the charset specified in Content-Type (including quoted values and
+case-insensitive parameter names), defaulting to UTF-8 when it is absent.
+Unsupported declared charsets raise a decoding error rather than silently using
+UTF-8. Transfer chunks are joined before decoding, so characters may span chunks.
 
 POST bodies are strings for text, JSON, XML and URL-encoded media types, and octet
 vectors for application/octet-stream and image/png. JSON and form data are not
