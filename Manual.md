@@ -309,7 +309,7 @@ callback that explicitly sets the HTTP status keeps that status on normal return
 | Public API | Contract |
 | --- | --- |
 | `http-request`, `http-get` | Request classes; `http-get` subclasses `http-request`. These are not HTTP client functions. |
-| `make-http-get (&rest args &key connection host port headers body path parameters fragment http-version)` | Constructs a request; normally the server does this. Although accepted in the function signature, `:host` is not a class initarg: use a Host header. |
+| `make-http-get (&rest args &key connection port headers body path parameters fragment http-version)` | Constructs a request; normally the server does this. Supply the host through a Host header; there is no `:host` constructor keyword. |
 | `path (request)` | Setf-able list of path segments, e.g. `("api" "greet")`, not a URL string. |
 | `parameters (request)` | Setf-able list of two-element lists, e.g. `(("name" "Ada"))`. |
 | `parse-url-query (string)` | Splits on `&` and first `=`; no percent decoding or `+` conversion. A key without `=` has NIL value. |
