@@ -524,7 +524,10 @@
                       (status-text response))
   (write-headers (headers response) stream)
   (write-message-line stream "")
-  (when (body response)
+  ;; HEAD carries the same representation headers as GET, but no body bytes.
+  (when (and (body response)
+             (not (and (slot-boundp response 'request)
+                       (typep (request response) 'http-head))))
     (write-body stream (body response))))
 
 (defun write-message-line (stream formatter &rest arguments)

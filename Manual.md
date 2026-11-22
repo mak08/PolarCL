@@ -332,7 +332,9 @@ POST bodies are strings for text, JSON, XML and URL-encoded media types, and oct
 vectors for application/octet-stream and image/png. JSON and form data are not
 parsed into objects/parameters. Only POST reads a request body; although PUT is
 recognized, it does not currently load its body. `Content-Length: 0` is explicitly
-handled. HEAD is recognized but the response writer does not suppress its body.
+handled. HEAD responses send the generated headers, including Content-Length,
+but omit the body on the wire. The route must explicitly permit `:head` when
+using `handle`, whose default method is GET.
 
 Response strings/vectors may be compressed based on Accept-Encoding. Set
 `Content-Encoding` to `"identity"` **before** setting the body to opt out.
