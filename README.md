@@ -16,6 +16,22 @@ redirects, with corresponding curl commands in the manual.
 (polarcl:stop-all-servers)
 ```
 
+## Tests
+
+Run `make` in the PolarCL directory first to generate `ctypes.cl` if it is absent.
+With PolarCL and its dependencies available to ASDF:
+
+```lisp
+(asdf:test-system "polarcl")
+;; Or run the test system directly:
+(asdf:test-system "polarcl/tests")
+```
+
+Both commands run the configuration/authorization and HTTP response regression
+suites, including HEAD, UTF-8 lengths and gzip. Tests use captured output rather
+than network listeners and isolate configuration registries. Assertion failures
+signal errors. Loading `polarcl` alone does not load or run the tests.
+
 ## Description
 PolarCL is a web server based on [mbedTLS](https://www.mbed.com/en/technologies/security/mbed-tls/) (formerly known as PolarSSL). It is still work in progress.
 PolarCL currently supports

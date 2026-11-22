@@ -8,6 +8,7 @@
   :description "Web server based on mbedtls"
   :default-component-class cl-source-file.cl
   :depends-on ("bordeaux-threads" "puri" "cl-base64" "cffi" "local-time" "makros" "cl-mbedtls" "zlib" "cl-ppcre")
+  :in-order-to ((test-op (test-op "polarcl/tests")))
   :serial t
   :components ((:file "package")
                (:file "ctypes")
@@ -26,6 +27,18 @@
                (:file "websockets")
                (:file "registered-functions")
                (:file "configuration")))
+
+(defsystem "polarcl/tests"
+  :description "PolarCL configuration, authorization and response regression tests"
+  :default-component-class cl-source-file.cl
+  :depends-on ("polarcl")
+  :serial t
+  :components ((:file "tests/configuration-tests")
+               (:file "tests/head-response-tests"))
+  :perform (test-op (operation system)
+             (declare (ignore operation system))
+             (uiop:symbol-call :polarcl-tests :run-tests)
+             (uiop:symbol-call :polarcl-head-tests :run-tests)))
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
