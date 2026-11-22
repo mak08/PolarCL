@@ -28,7 +28,7 @@ With PolarCL and its dependencies available to ASDF:
 ```
 
 Both commands run the configuration/authorization, HTTP response and request
-charset regression suites, including HEAD, UTF-8 lengths and gzip. Tests use captured output rather
+charset and PUT regression suites, including HEAD, UTF-8 lengths and gzip. Tests use captured output rather
 than network listeners and isolate configuration registries. Assertion failures
 signal errors. Loading `polarcl` alone does not load or run the tests.
 
@@ -73,6 +73,7 @@ for dependency and native-library setup details.
 
 ## Limitations
 
-See the manual for current limitations, including PUT body handling and
-experimental WebSocket support.
+PUT bodies are read and available to application handlers; resource creation or
+replacement must be implemented by the application. See the manual for current
+limitations, including experimental WebSocket support.
 POST requests with an explicit `Content-Length: 0` are handled by the current code.

@@ -444,7 +444,7 @@
       (error "Missing Host in ~a" request))
     (setf (headers request) headers)
     (typecase request
-      (http-post
+      ((or http-post http-put)
        ;; Read request body
        ;;   This should be deferred, but remember to clear the input if the connection is kept alive. 
        (get-body connection request)))

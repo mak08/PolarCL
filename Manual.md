@@ -333,13 +333,37 @@ case-insensitive parameter names), defaulting to UTF-8 when it is absent.
 Unsupported declared charsets raise a decoding error rather than silently using
 UTF-8. Transfer chunks are joined before decoding, so characters may span chunks.
 
-POST bodies are strings for text, JSON, XML and URL-encoded media types, and octet
+POST and PUT bodies are strings for text, JSON, XML and URL-encoded media types, and octet
 vectors for application/octet-stream and image/png. JSON and form data are not
-parsed into objects/parameters. Only POST reads a request body; although PUT is
-recognized, it does not currently load its body. `Content-Length: 0` is explicitly
+parsed into objects/parameters. PUT uses the same body reader as POST, including
+charset decoding and supported compression/transfer encodings. `Content-Length: 0` is explicitly
 handled. HEAD responses send the generated headers, including Content-Length,
 but omit the body on the wire. The route must explicitly permit `:head` when
 using `handle`, whose default method is GET.
+
+PUT support covers parsing, routing and making the body available to callbacks.
+Register a route with `:method :put` and read `(http-body request)` in its handler.
+The application must implement resource creation/replacement and choose the
+response status. There are no automatic filesystem writes; a static-file handler
+still reads files even if its route permits PUT. For example, this diagnostic
+endpoint echoes a text PUT body without storing it:
+
+```lisp
+(polarcl:handle
+ :request (:method :put :path "/put-echo")
+ :handler (:dynamic (lambda (server handler request response)
+                      (declare (ignore server handler))
+                      (setf (polarcl:http-header response :|Content-Type|)
+                            "text/plain; charset=utf-8"
+                            (polarcl:http-body response)
+                            (polarcl:http-body request)))
+           :authentication nil))
+```
+
+```sh
+curl -i -X PUT -H 'Content-Type: text/plain; charset=utf-8' \
+  --data-binary 'Grüße' http://127.0.0.1:8080/put-echo
+```
 
 Response strings/vectors may be compressed based on Accept-Encoding. Set
 `Content-Encoding` to `"identity"` **before** setting the body to opt out.
