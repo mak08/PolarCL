@@ -177,10 +177,8 @@ Handler options select one of:
 | `:request-function` | Non-NIL selects `rfunc-handler`; calls a registered function chosen by URL. |
 | `:websocket` | Function `(server handler request response)` after an upgrade handshake; experimental, see limitations. |
 
-All accept `:realm`, `:authentication` and `:authorizer`. The `handle` macro
-defaults to Basic authentication and NIL realm; explicitly use
-`:authentication nil` for public dynamic/static content, or set a realm and user.
-Select one handler kind per form.
+All require an explicit `:authentication` choice: NIL for public access, or a
+scheme policy described below. Select one handler kind per form.
 
 ### Static files
 
@@ -239,7 +237,7 @@ A dynamic callback sets the existing response:
         (polarcl:http-body response) "{\"status\":\"ok\"}"))
 ```
 
-`register-function (path &key symbol (authorizer #'function-authorizer))`
+`register-function (path &key symbol)`
 registers a **string key**. The last URL path segment is looked up in a global,
 case-sensitive table: `/api/greet` looks up `"greet"`; earlier segments only
 participate in route matching. Supplying `:symbol 'my-function` is the clearest
@@ -258,51 +256,199 @@ without changing case: `?name=Ada` supplies `:|name|`, not `:NAME`.
   (setf (polarcl:http-header response :|Content-Type|) "text/plain")
   (format nil "Hello, ~a!" |name|))
 
-(polarcl:register-function "greet" :symbol 'greet
- :authorizer (lambda (handler request registered-function)
-               (declare (ignore handler request registered-function)) t))
+(polarcl:register-function "greet" :symbol 'greet)
 (polarcl:handle :request (:path "/api/greet")
                 :handler (:query-function t :authentication nil))
 ```
 
-Registered-function authorization runs **even if handler authentication is NIL**.
-Its default checks the built-in user registry. A public function thus needs an
-explicit permissive three-argument authorizer as above. Unknown function names
-raise an error. Unknown keywords can also error unless the callback accepts them.
+Registered functions inherit their matched route's authentication policy. There
+is no function-level authentication or authorization callback. Unknown function
+names raise an error. Unknown keywords can also error unless the callback accepts
+them.
 
 ## Authentication
 
+PolarCL performs one authentication decision after route selection and before
+calling the content handler. Registered functions do not authenticate again.
+Authorization (roles, permissions, scopes), account management, OAuth/OIDC login,
+SSO, JWT verification and token issuance are application concerns. Providers can
+integrate external identity systems without changing HTTP dispatch.
+
+Every `handle` form must explicitly choose `:authentication nil` or one scheme:
+
 ```lisp
+(polarcl:handle :request (:prefix "/public")
+ :handler (:static "/srv/public" :authentication nil))
+
 (polarcl:user :username "reader" :realm "reports" :password "example-only")
 (polarcl:handle :request (:path "/private")
-                :handler (:dynamic #'my-health-handler :realm "reports"))
+ :handler (:dynamic #'my-health-handler
+           :authentication (:basic :realm "reports" :provider :local-users)))
 ```
 
-With an HTTPS listener, try
-`curl --cacert /path/to/ca.pem -u reader:example-only https://localhost:4443/private`.
-Basic credentials are only base64 encoded on the wire; use HTTPS for real users.
-The built-in registry stores passwords in plaintext despite its slot name
-`hashed-password`. `user` is a keyword macro over
-`register-user (name realm password)`; re-registering the same name/realm replaces
-its entry. This is an in-memory registry, not the server's database file.
+The scheme specification is a literal list; its option values are evaluated.
+A missing authentication option, unknown scheme/provider, missing realm, or old
+`:authorizer`/handler-level `:realm` option is a configuration error. One scheme
+is supported per route. Providers must be registered before routes using them.
 
-| Public function | Contract |
+Public routes ignore authentication credentials and expose no principal. A
+protected route verifies each request separately, including on persistent
+connections. It never treats a previous request's identity as proof for the next.
+All handler kinds use this mechanism. A successful callback may set its own HTTP
+status; authentication does not overwrite it.
+
+### Policies and transport
+
+| Policy option | Meaning |
 | --- | --- |
-| `http-credentials (request)` | Returns username and password as two values from Basic credentials, or NIL when absent. |
-| `authenticate (handler request)` | Calls the handler authorizer and caches success/failure on the request; returns a boolean. |
-| `http-authenticated-user (handler request)` | Authenticates, then returns the values of `http-credentials`; primary value is the username. |
-| `default-authorizer (handler request)` | Checks credentials against the handler realm's registered users. |
-| `function-authorizer (handler request registered-function)` | Default function authorizer; delegates to `default-authorizer`. |
-| `declining-authorizer (handler request registered-function)` | Always NIL; three-argument function-authorizer signature. |
+| `:realm` | Required nonempty printable ASCII protection-space label, not a role. Quotes and backslashes are escaped in challenges. |
+| `:provider` | Named credential provider; defaults to `:local-users`, `:local-tokens`, or `:local-digest` for the selected scheme. |
+| `:require-tls` | Defaults to T. Basic/Digest permit an explicit NIL for local development. Bearer always requires TLS. |
+| `:nonce-lifetime` | Digest lifetime in seconds; default 300, allowed 1–3600. |
 
-A custom handler `:authorizer` takes two arguments and returns a truth value.
-A registered-function authorizer takes three. Do not pass `declining-authorizer`
-as a handler authorizer without an adapter. An authentication failure at the
-handler or registered-function level returns 401 with a Basic challenge when the
-authorizer returns NIL. The application callback is not called after denial.
-Errors raised by user authorizers or application callbacks follow normal error
-handling (500); they are not converted to authentication failures. An application
-callback that explicitly sets the HTTP status keeps that status on normal return.
+TLS is determined from the actual connection; untrusted forwarded headers do not
+assert a secure connection. TLS termination in a reverse proxy is not integrated
+in this version. An insecure request to a TLS-required route gets 403 without
+calling the provider. With an HTTPS listener, try:
+
+```sh
+curl --cacert /path/to/ca.pem -u reader:example-only https://localhost:4443/private
+```
+
+### Built-in credential stores
+
+`user` expands to `register-user (name realm password &key provider principal)`.
+Basic passwords are normalized to NFC and stored only as salted
+PBKDF2-HMAC-SHA256 verifiers (600,000 iterations, random 16-byte salt). The default
+principal has the username as ID and `:local-users` as source. Passwords containing
+colons are supported; usernames containing colons or control characters are not.
+The Basic challenge advertises `charset="UTF-8"`; this encoding is independent
+of the request body's Content-Type charset.
+
+Bearer tokens are opaque, high-entropy application-issued secrets. PolarCL stores
+their SHA-256 hashes, principal and optional expiry, not the raw token:
+
+```lisp
+(polarcl:register-token application-issued-token
+ (polarcl:make-principal :id "routing-client" :source :my-application)
+ :realm "api" :expires (+ (get-universal-time) 3600))
+(polarcl:handle :request (:prefix "/api")
+ :handler (:query-function t
+           :authentication (:bearer :realm "api" :provider :local-tokens)))
+;; Revoke the exact registration:
+(polarcl:revoke-token application-issued-token :realm "api")
+```
+
+`register-token (token principal &key provider realm expires)` uses universal time;
+NIL expiry means no expiration. Only the Authorization header transport is
+accepted. Query/form tokens are not authentication inputs. Possessing a token
+establishes its verified principal context, not necessarily a human identity.
+No scopes are enforced by PolarCL.
+
+Digest uses a separate credential store because password verifiers for Basic
+cannot be used to calculate Digest proofs:
+
+```lisp
+(polarcl:register-digest-user "reader" "reports" :password "example-only")
+(polarcl:handle :request (:path "/digest")
+ :handler (:dynamic #'my-health-handler
+           :authentication (:digest :realm "reports" :provider :local-digest)))
+```
+
+`register-digest-user (name realm &key password ha1 provider principal)` requires
+exactly one of password or HA1. HA1 is the 64-digit SHA-256 hexadecimal digest of
+UTF-8 `username:realm:password`; username/password are normalized to NFC when
+provisioning from a password. HA1 is password-equivalent sensitive material.
+
+The supported Digest profile is SHA-256, `qop=auth`, UTF-8 (including
+`username*` extended parameters). It validates the exact
+method and request target (including query), nonce lifetime and increasing nonce
+counts per username/cnonce. Expired, otherwise valid proofs receive `stale=true`.
+Nonces are bound to the route policy. Replay checks and updates are atomic.
+Nonce storage is bounded at 4,096 entries, each with at most 4,096 counter keys;
+capacity exhaustion fails closed. Reset/restart invalidates nonces. This is
+process-local state, not a distributed replay store. SHA-256-sess, MD5,
+SHA-512/256, `auth-int`, userhash and proxy authentication are not implemented.
+
+```sh
+curl --cacert /path/to/ca.pem --digest -u reader:example-only \
+  https://localhost:4443/digest
+```
+
+Stores are in memory. Re-registering a key replaces its entry. Configuration
+reset clears local users, tokens, Digest credentials, providers and nonce state.
+The crypto backend uses native mbedTLS 3's PBKDF2 API and stateless SHA-256 API;
+randomness comes from `/dev/urandom`, and Unicode normalization uses SBCL.
+
+### Principal and provider API
+
+`request-principal (request)` returns a `principal` or NIL. Its public accessors
+are `principal-id`, `principal-source`, and `principal-attributes`.
+`request-authentication` returns an authentication context or NIL; inspect it
+with `authentication-context-principal` and `authentication-context-scheme`.
+Passwords and bearer tokens are not stored in the principal/context.
+
+Register an application provider with
+`register-authentication-provider (name scheme function)`. The function receives
+`(policy request credentials)` and returns either
+`(authentication-success principal)` or `(authentication-rejected)`.
+
+```lisp
+(polarcl:register-authentication-provider :external-tokens :bearer
+ (lambda (policy request credentials)
+   (declare (ignore policy request))
+   ;; Application code validates issuer, audience, signature/expiry, revocation,
+   ;; etc. or performs introspection. Merely decoding a JWT is not validation.
+   (let ((identity (validate-access-token (polarcl:credentials-token credentials))))
+     (if identity
+         (polarcl:authentication-success
+          (polarcl:make-principal :id identity :source :external-issuer))
+         (polarcl:authentication-rejected)))))
+```
+
+The callback can inspect `authentication-policy-realm` and
+`authentication-policy-scheme`. Basic credentials expose `credentials-username`
+and `credentials-password`; Bearer exposes `credentials-token`; Digest supplies
+the username. A Digest provider returns
+`(authentication-success principal :digest-ha1 hash)` so PolarCL can verify the
+proof; provider success alone does not authenticate Digest. A provider returning
+NIL or another invalid result is an application error, not a credential rejection.
+Providers must be safe for concurrent calls. They do not receive a response to
+mutate; PolarCL owns challenge/status generation. No automatic retries occur.
+
+### Failures, RFC scope and migration
+
+| Outcome | Response |
+| --- | --- |
+| Missing credentials or an unsupported credential scheme | 401 with the route's challenge; no application callback. |
+| Rejected credentials | 401; Bearer adds `error="invalid_token"`. |
+| Malformed credentials or duplicate Authorization fields | 400; Bearer adds `error="invalid_request"`. |
+| TLS required but absent | 403. |
+| Provider or application exception | 500 with generic text, not exception details. |
+| Application sets a response status | Preserved on normal callback return. |
+
+All 401 responses contain WWW-Authenticate. Missing Bearer credentials do not
+include an error parameter. Credential-bearing headers are redacted when printed;
+request-header and request-body trace dumps are disabled. Applications must also
+avoid logging credentials in their own providers.
+
+The framework follows [RFC 9110 §11](https://www.rfc-editor.org/rfc/rfc9110.html#section-11),
+which supersedes RFC 7235, with the profiles above for
+[Basic (RFC 7617)](https://www.rfc-editor.org/rfc/rfc7617.html),
+[Bearer (RFC 6750)](https://www.rfc-editor.org/rfc/rfc6750.html), and
+[Digest (RFC 7616)](https://www.rfc-editor.org/rfc/rfc7616.html).
+This is an origin-server implementation, not an OAuth authorization server or
+HTTP proxy. Optional authentication, multiple schemes per route, sessions,
+role/scope policies and built-in identity-provider integrations are outside this
+version. Provider hooks leave room for separate integration libraries.
+
+Migration is intentional: remove handler/function `:authorizer` options and
+handler-level `:realm`; select a policy or explicit NIL on each HANDLE.
+`create-handler` is internal. Legacy `authenticate`, `http-credentials`,
+`http-authenticated-user`, `default-authorizer`, `function-authorizer` and
+`declining-authorizer` are no longer public APIs. Read the verified principal
+instead of reparsing credentials. Bitsailor's routes are public; the old HTTP
+`/quit` route has been removed rather than exposing unauthenticated shutdown.
 
 ## Requests, responses and cookies
 
@@ -394,16 +540,17 @@ Set-Cookie header. Default max-age is 30 days (seconds); options default to
                     :options '("Secure" "HttpOnly" "Path=/" "SameSite=Lax"))
 ```
 
-## Lower-level registration API
+## Lower-level registration internals
 
-For programmatically assembled configuration, use the exported constructors:
+Applications should use HANDLE. The following illustrates internal construction
+for maintainers; `create-handler` is no longer exported:
 
 ```lisp
 (polarcl:register-handler
  :filter (polarcl:create-filter 'polarcl:exact-filter
            :protocol '("HTTP" "HTTPS") :port '("8081")
            :method '(:get) :path "/health")
- :handler (polarcl:create-handler 'polarcl:dynhtml-handler
+ :handler (polarcl::create-handler 'polarcl:dynhtml-handler
             :contentfn #'my-health-handler :authentication nil))
 ```
 
@@ -414,12 +561,10 @@ use **class defaults**, not the apparent keyword defaults on the constructor:
 protocols HTTP/HTTPS, ports 80/443/8080/4443, all five supported methods, NIL host,
 and `/index.html`. By contrast, `handle` passes NIL port (any port) and GET.
 
-`create-handler (type &rest args &key method redirector realm authentication
- authorizer rootdir wsfunction contentfn)` likewise forwards arguments. Use the
-exported `file-handler`, `dynhtml-handler`, `qfunc-handler`, `rfunc-handler` and
-only initargs supported by that class. `:method` and `:redirector` appear in the
-signature but are not handler class initargs. Direct handler creation defaults
-to NIL authentication and realm `"root"`, unlike the `handle` macro.
+`create-handler (type &rest args &key authentication rootdir wsfunction contentfn)`
+is internal and forwards arguments to `make-instance`. Its authentication value
+is NIL or an internal validated policy object. Class-specific initargs apply only
+to the corresponding handler type. Applications use HANDLE to validate policies.
 
 `register-handler (&key filter handler)` installs a route.
 `create-redirector (&key scheme host port path query)` constructs a redirector;
@@ -437,13 +582,13 @@ positional `user`, `:max-threads`, scalar filter ports, symbol-only
 WebSocket configuration performs a handshake and calls the four-argument callback,
 but there is no public frame read/write API; ordinary response processing also
 continues afterward. Treat it as experimental, not a complete WebSocket service.
-Digest authentication, static uploads and automatic JSON serialization are not
-implemented. Request parsing and response compression have limited negotiation;
+Static uploads and automatic JSON serialization are not implemented. Request parsing and response compression have limited negotiation;
 this manual describes actual behavior rather than claiming full HTTP compliance.
 
 Implementation map: [configuration.cl](configuration.cl) contains the configuration
 macros; [server.cl](server.cl) the listener and parser;
-[handlers.cl](handlers.cl) routing, files and authentication;
+[handlers.cl](handlers.cl) routing and files;
+[authentication.cl](authentication.cl) authentication policies, stores and protocols;
 [registered-functions.cl](registered-functions.cl) function dispatch;
 [messages.cl](messages.cl) request/response accessors;
 [cookies.cl](cookies.cl) cookies.

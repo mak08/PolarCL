@@ -54,7 +54,7 @@
           (let ((response (polarcl::make-ok-response request)))
             (polarcl::handle-response
              (make-instance 'polarcl:http-server) nil
-             (polarcl:create-handler 'polarcl:dynhtml-handler
+             (polarcl::create-handler 'polarcl:dynhtml-handler
               :contentfn (lambda (server handler req res)
                            (declare (ignore server handler))
                            (setf (polarcl:http-body res) (polarcl:http-body req))))

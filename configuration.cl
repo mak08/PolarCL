@@ -48,10 +48,10 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 
-(defmacro user (&key username realm password)
+(defmacro user (&key username realm password (provider :local-users))
   `(let ()
      (log2:info "Adding USER ~a@~a" ,username ,realm)
-     (register-user ,username ,realm ,password)))
+     (register-user ,username ,realm ,password :provider ,provider)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -106,10 +106,13 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
              handler))))
     (destructuring-bind (&key host (method :get) (port nil) path prefix regex)
         request
-      (destructuring-bind (&key static directory dynamic websocket query-function request-function realm (authentication :basic) (authorizer #'default-authorizer))
+      (destructuring-bind (&key static directory dynamic websocket query-function request-function (authentication nil authentication-p))
           handler
+        (unless authentication-p
+          (error "HANDLE requires an explicit :authentication policy (or NIL)."))
         (let*
-            ((methods (if (atom method) (list method) method))
+            ((policy (when authentication `(make-authentication-policy ,(car authentication) ,@(cdr authentication))))
+             (methods (if (atom method) (list method) method))
              (filter
                (cond
                  (path
@@ -123,20 +126,20 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
              (handler
                (cond
                  (static
-                  `(create-handler 'file-handler :rootdir ,static :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                  `(create-handler 'file-handler :rootdir ,static :authentication ,policy))
                  (directory
-                  `(create-handler 'directory-handler :rootdir ,directory :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                  `(create-handler 'directory-handler :rootdir ,directory :authentication ,policy))
                  (dynamic
-                  `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                  `(create-handler 'dynhtml-handler :contentfn ,dynamic :authentication ,policy))
                  (query-function
-                  `(create-handler 'qfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                  `(create-handler 'qfunc-handler :authentication ,policy))
                  (request-function
-                  `(create-handler 'rfunc-handler :authentication ,authentication :authorizer ,authorizer :realm ,realm))
+                  `(create-handler 'rfunc-handler :authentication ,policy))
                  (websocket
-                  `(create-handler 'websocket-handler :wsfunction ,websocket :authentication ,authentication :authorizer ,authorizer :realm ,realm)))))
-          `(let ()
-             (log2:info "Adding HANDLER ~a ~a" ,filter ,handler)
-             (register-handler :filter ,filter :handler ,handler)))))))
+                  `(create-handler 'websocket-handler :wsfunction ,websocket :authentication ,policy)))))
+          `(let ((filter ,filter) (handler ,handler))
+             (log2:info "Adding HANDLER ~a ~a" filter handler)
+             (register-handler :filter filter :handler handler)))))))
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

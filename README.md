@@ -28,7 +28,7 @@ With PolarCL and its dependencies available to ASDF:
 ```
 
 Both commands run the configuration/authorization, HTTP response and request
-charset and PUT regression suites, including HEAD, UTF-8 lengths and gzip. Tests use captured output rather
+charset and PUT regression suites, including authentication protocols, HEAD, UTF-8 lengths and gzip. Tests use captured output rather
 than network listeners and isolate configuration registries. Assertion failures
 signal errors. Loading `polarcl` alone does not load or run the tests.
 
@@ -38,7 +38,7 @@ PolarCL currently supports
 * Secure (TLS) and plain socket connections
 * Multithreading using a thread pool or on-demand thread creation
 * Connection keep-alive
-* Basic authentication (Digest access authentication is planned)
+* Explicit per-route authentication: public, Basic, Bearer, or Digest SHA-256 (`qop=auth`)
 * Cookies
 * Redirection
 * Conditional requests (if-modified-since)
@@ -70,6 +70,14 @@ Furthermore, PolarCL supports server-side programming in Common Lisp
 The system also declares cl-ppcre; see [polarcl.asd](polarcl.asd) and the manual
 for dependency and native-library setup details.
 
+
+## Authentication
+
+Each `handle` requires `:authentication nil` or a scheme policy. See the
+[authentication API](Manual.md#authentication) for local credential stores,
+provider hooks, TLS requirements and migration from the old authorizer API.
+Authorization, SSO and identity-provider workflows remain application concerns.
+The built-in stores require mbedTLS 3 (PBKDF2), SBCL and `/dev/urandom`.
 
 ## Limitations
 

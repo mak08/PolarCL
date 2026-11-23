@@ -5,38 +5,14 @@
 
 (in-package "POLARCL")
 
-(defun function-authorizer (handler request registered-function)
-  (log2:trace "Authorizing ~a for request ~a" registered-function request)
-  ;; DONT call authenticate, authenticate calls the handler's authorizer!
-  (default-authorizer handler request))
-
-(defstruct registered-function name symbol (authorizer #'function-authorizer))
+(defstruct registered-function name symbol)
 
 (defmacro with-func-from-path ((fsym handler request response) &body body)
-  `(destructuring-bind (fname &rest namespace)
-       (reverse (path ,request))
-     (let ((registered-function (gethash fname *registered-functions-ht*)))
-       (unless registered-function
-         (log2:warning "Unregistered function ~s" fname)
-         (error "Function ~s is not registered" fname))
-       (cond
-         ((funcall (registered-function-authorizer registered-function)
-                   ,handler
-                   ,request
-                   registered-function)
-          (log2:trace "Authorized ~a using ~a" registered-function (registered-function-authorizer registered-function))
-          (setf (authentication-state ,request) :authenticated)
-          (let ((,fsym (registered-function-symbol registered-function)))
-            (log2:debug "Executing ~a" ,fsym)
-            ,@body))
-         (t
-          ;; Denial is a response, not an application error. Do not catch errors
-          ;; from either the authorizer or the registered function as denials.
-          (let ((challenge (make-authenticate-response ,handler ,request)))
-            (setf (status-code ,response) (status-code challenge)
-                  (status-text ,response) (status-text challenge)
-                  (headers ,response) (headers challenge)
-                  (body ,response) (body challenge))))))))
+  (declare (ignore handler response))
+  `(let* ((fname (car (last (path ,request))))
+          (entry (gethash fname *registered-functions-ht*)))
+     (unless entry (error "Function is not registered"))
+     (let ((,fsym (registered-function-symbol entry))) ,@body)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 2 Calling URL-specified functions
@@ -45,11 +21,10 @@
 
 (defvar *registered-functions-ht* (make-hash-table :test #'equal))
 
-(defun register-function (path &key (symbol (symbol-from-path path)) (authorizer #'function-authorizer))
+(defun register-function (path &key (symbol (symbol-from-path path)))
   (setf (gethash path *registered-functions-ht*)
         (make-registered-function :name path
-                                  :symbol symbol
-                                  :authorizer authorizer)))
+                                  :symbol symbol)))
 
 (defun symbol-from-path (path)
   ;; The client uses $path to designate the function.  

@@ -85,7 +85,7 @@
   (setf *prefix-handlers* nil)
   (setf *regex-handlers* nil)
   (setf *servers* nil)
-  (setf *users* (make-hash-table :test #'equal))
+  (reset-authentication)
   (setf *registered-functions-ht* (make-hash-table :test #'equal)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -379,7 +379,7 @@
 
 (defun parse-request-header (line)
   (declare (string line))
-  (log2:trace "<<< ~a" line)
+  ;; Header values may contain passwords or bearer tokens; never log them.
   (let* ((index (position #\: line))
          (key (intern (string-downcase
                        (subseq line 0 index))
@@ -426,6 +426,7 @@
              ;; Discard the :ABSOLUTE indicator
              (cdr (puri:uri-parsed-path url)))
            (parameters (parse-url-query (puri:uri-query url))))
+      (setf (request-target request) query-path)
       (setf (path request) path)
       (setf (parameters request) parameters)
       (setf (http-version request) http-version)
@@ -451,8 +452,8 @@
     request))
 
 (defun log-request (connection request)
-  (log2:trace "~%========================================~%~a~%========================================~%"
-              (print-request nil request :max-body-size 4000000)))
+  (declare (ignore connection))
+  (log2:trace "Request method ~a" (http-method request)))
 
 (defun get-body (stream request)
   (let* ((content-type (http-content-type request))

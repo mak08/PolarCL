@@ -18,12 +18,8 @@
   (setf (polarcl:http-header response :|Content-Type|) "text/plain"
         (polarcl:http-body response) (polarcl:http-body request)))
 
-(defun public-function (handler request registered-function)
-  (declare (ignore handler request registered-function))
-  t)
-
-(polarcl:register-function "greet" :symbol 'greet :authorizer #'public-function)
-(polarcl:register-function "echo" :symbol 'echo-body :authorizer #'public-function)
+(polarcl:register-function "greet" :symbol 'greet)
+(polarcl:register-function "echo" :symbol 'echo-body)
 
 (polarcl:handle :request (:path "/health")
                 :handler (:dynamic #'health :authentication nil))

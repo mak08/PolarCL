@@ -106,10 +106,7 @@
    (query :accessor redirector-query :initarg :query)))
 
 (defclass handler (request-processor)
-  ((realm :reader handler-realm :initarg :realm :initform "root")
-   (database :reader database :initarg :database)
-   (authentication :reader handler-authentication :initarg :authentication :initform nil)
-   (authorizer :reader handler-authorizer :initarg :authorizer :initform #'default-authorizer)))
+  ((authentication :reader handler-authentication :initarg :authentication :initform nil)))
 
 (defmethod print-object ((thing handler) stream)
   (format stream "#<~a>" (type-of thing)))
@@ -190,7 +187,7 @@
 ;;;
 ;;; 1 - Search for a redirector. If found, redirect the request (eg, redirect HTTP to HTTPS)
 ;;; 2 - Search for a handler. If none was found, respond with *notfound-response* 
-;;; 3 - Perform authentication specified by the handler. Basic authentication is the default.
+;;; 3 - Perform authentication specified by the handler. The route explicitly selects public access or an authentication policy.
 ;;;     CAUTION: Basic Authentication should be used only over HTTPS
 ;;; 4 - Create response object
 ;;; 5 - Call handle-response on the handler, request and response
@@ -234,23 +231,18 @@
        ;; 2 - Find handler
        ((dispatcher (find-handler connection request))
         (log2:trace "Handling request ~a using ~a" request dispatcher)
-        (let ((handler (dispatcher-processor dispatcher)))
-          (cond
-            ;; Authentication
-            ((and (handler-authentication handler)
-                  (not (authenticate handler request)))
-             (log2:info "Authentication failed for ~a peer ~a request ~a" (handler-realm handler) (mbedtls:peer connection) request)
-             (make-authenticate-response handler request))
-            (T
-             (let ((response (make-ok-response request)))
-               (handle-response server (dispatcher-filter dispatcher) handler connection request response)
-               response)))))
+        (let* ((handler (dispatcher-processor dispatcher))
+               (failure (authenticate-request (handler-authentication handler) request)))
+          (or failure
+              (let ((response (make-ok-response request)))
+                (handle-response server (dispatcher-filter dispatcher) handler connection request response)
+                response))))
        ;; 3 - No handler found. Reply with "Bad Request".
        (t
         (make-http-response :request request :status-code "404" :status-text "Not found")))
     (error (e)
-      (log2:error "Caught ~a while handling ~a" e request)
-      (make-error-response request :body (format nil "~a" e)))))
+      (log2:error "Request failed (~a)" (type-of e))
+      (make-error-response request))))
 
 (defun default-port (scheme)
   (cond
@@ -284,11 +276,11 @@
 
 (defgeneric create-handler (type
                             &rest args
-                            &key method redirector realm authentication authorizer rootdir wsfunction contentfn))
+                            &key authentication rootdir wsfunction contentfn))
 
 (defmethod create-handler (type
                            &rest args
-                           &key method redirector realm authentication authorizer rootdir wsfunction contentfn)
+                           &key authentication rootdir wsfunction contentfn)
   (apply #'make-instance type args))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -351,72 +343,6 @@
 
 (defun create-redirector (&key scheme host port path query)
   (make-instance 'redirector :scheme scheme :host host :port port :path path :query query))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Users & Authentication
-
-(defstruct user id hashed-password name authorizations)
-
-(defvar *users* (make-hash-table :test #'equal))
-
-(defun register-user (name realm password)
-  ;;; ### password hashing is not implemented yet!
-  (setf (gethash (credname name realm) *users*)
-        (make-user :id 0 :hashed-password password :name name)))
-
-(defun credname (name realm)
-  (format nil "~a@~a" name realm))
-
-(defun get-user-info (name)
-  (gethash name *users*))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun http-credentials (request)
-  (let ((credentials (http-header request :|authorization|)))
-    (when credentials
-      (let ((credentials
-             (base64:base64-string-to-string
-              (cadr (cl-utilities:split-sequence #\space credentials)))))
-        (when credentials
-          (let ((user
-                 (subseq credentials 0 (position #\: credentials)))
-                (password
-                 (subseq credentials (1+ (position #\: credentials)))))
-            (values user password)))))))
-
-(defun http-authenticated-user (handler request)
-  (when (authenticate handler request)
-    (http-credentials request)))
-
-(defun authenticate (handler request)
-  "Authenticate users defined with the USER server configuration macro.
-Implement an authorizer using HTTP-CREDENTIALS for alternative authentication."
-  (log2:trace "Authorizing with ~a" (handler-authorizer handler))
-  (cond
-    ((null (authentication-state request))
-     (let ((authorizer (handler-authorizer handler)))
-       (log2:trace "Using authorizer ~a" authorizer)
-       (if (funcall authorizer handler request)
-           (setf (authentication-state request) :authenticated)
-           (setf (authentication-state request) :unauthenticated))))
-    (t
-     (log2:trace "Skipping authentication of ~a, already authenticated." (http-credentials request))))
-  (eq (authentication-state request) :authenticated))
-
-(defun declining-authorizer (handler request registered-function)
-  nil)
-
-(defun default-authorizer (handler request)
-  (multiple-value-bind (user password)
-      (http-credentials request)
-    (when user
-      (let* ((credname (credname user (handler-realm handler)))
-             (user-info (get-user-info credname)))
-        (log2:trace "Authorizing ~a ~a ~a" credname user (handler-realm handler))
-        (when user-info
-          (string= password
-                   (user-hashed-password user-info)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 1-1 Serving static files

@@ -1,0 +1,181 @@
+(defpackage :polarcl-auth-tests (:use :cl) (:export :run-tests))
+(in-package :polarcl-auth-tests)
+(defclass test-connection () ())
+(defmethod mbedtls:peer ((connection test-connection)) "127.0.0.1")
+(defclass test-request (polarcl:http-get)
+  ((protocol :initarg :protocol :initform :https :reader protocol)))
+(defmethod polarcl::http-protocol ((request test-request)) (protocol request))
+(defun request (&optional authorization &key (target "/test") (protocol :https))
+  (let ((request (make-instance 'test-request :protocol protocol :port "4443"
+                   :request-target target :path '("test") :parameters nil
+                   :headers (list (make-instance 'polarcl:http-header :name :|host| :value "localhost")))))
+    (when authorization (setf (polarcl:http-header request :|Authorization|) authorization)) request))
+(defun basic (user password)
+  (concatenate 'string "Basic " (base64:usb8-array-to-base64-string
+                                 (babel:string-to-octets (format nil "~a:~a" user password) :encoding :utf-8))))
+(defun status (response code)
+  (assert (and response (equal code (polarcl:status-code response)))) response)
+(defun failure-p (thunk)
+  (handler-case (progn (funcall thunk) nil) (error () t)))
+(defun dispatch (policy req callback &optional (kind 'polarcl:dynhtml-handler))
+  (let ((polarcl::*handlers* nil) (polarcl::*exact-handlers* nil)
+        (polarcl::*prefix-handlers* nil) (polarcl::*regex-handlers* nil)
+        (polarcl::*redirectors* nil))
+    (polarcl:register-handler :filter (polarcl:create-filter 'polarcl:exact-filter :port nil :path "/test")
+      :handler (if (eq kind 'polarcl:dynhtml-handler)
+                   (polarcl::create-handler kind :authentication policy :contentfn callback)
+                   (progn (polarcl:register-function "test" :symbol callback)
+                          (polarcl::create-handler kind :authentication policy))))
+    (polarcl::handle-request (make-instance 'polarcl:http-server) (make-instance 'test-connection) req)))
+(defun digest-header (nonce &key (nc "00000001") (uri "/test?x=1") (method "GET"))
+  (let ((hash (polarcl::auth-sha256
+               (format nil "~a:~a:~a:client:auth:~a"
+                       (polarcl::auth-sha256 "alice:private:secret") nonce nc
+                       (polarcl::auth-sha256 (format nil "~a:~a" method uri))))))
+    (format nil "Digest username=~s, realm=~s, nonce=~s, uri=~s, algorithm=SHA-256, qop=auth, nc=~a, cnonce=~s, response=~s"
+            "alice" "private" nonce uri nc "client" hash)))
+(defun run-tests ()
+  (let ((polarcl::*authentication-providers* (make-hash-table :test #'equal))
+        (polarcl::*auth-users* (make-hash-table :test #'equal))
+        (polarcl::*auth-tokens* (make-hash-table :test #'equal))
+        (polarcl::*digest-users* (make-hash-table :test #'equal))
+        (polarcl::*digest-nonces* (make-hash-table :test #'equal))
+        (polarcl::*registered-functions-ht* (make-hash-table :test #'equal)))
+    ;; Published primitives ensure this isn't just a self-consistency test.
+    (assert (equal "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+                   (polarcl::auth-sha256 "abc")))
+    (assert (equal "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b"
+                   (polarcl::auth-password-hash "password" (babel:string-to-octets "salt") 1)))
+    (assert (failure-p (lambda () (macroexpand-1 '(polarcl:handle :request (:path "/") :handler (:dynamic #'identity))))))
+    (assert (failure-p (lambda () (polarcl::make-authentication-policy :basic :realm "x" :provider :missing))))
+    (assert (failure-p (lambda () (polarcl::make-authentication-policy :bearer :realm "x" :require-tls nil))))
+    (assert (failure-p (lambda () (polarcl::make-authentication-policy :unknown :realm "x"))))
+    (assert (eq :internal (nth-value 1 (find-symbol "CREATE-HANDLER" :polarcl))))
+    (let ((public (request "Basic !!")))
+      (assert (null (polarcl::authenticate-request nil public)))
+      (assert (null (polarcl:request-principal public))))
+    (polarcl:register-user "alice" "private" "päss:word")
+    (let ((policy (polarcl::make-authentication-policy :basic :realm "private")))
+      (let ((response (status (polarcl::authenticate-request policy (request)) "401")))
+        (assert (equal "Basic realm=\"private\", charset=\"UTF-8\""
+                       (polarcl:http-header response :|WWW-Authenticate|))))
+      (status (polarcl::authenticate-request policy (request (basic "alice" "wrong"))) "401")
+      (status (polarcl::authenticate-request policy (request "Basic !!")) "400")
+      (status (polarcl::authenticate-request policy (request "Basic bm9jb2xvbg==")) "400")
+      (status (polarcl::authenticate-request policy (request (basic "alice" "päss:word") :protocol :http)) "403")
+      (let ((req (request (basic "alice" "päss:word"))))
+        (assert (null (polarcl::authenticate-request policy req)))
+        (assert (equal "alice" (polarcl:principal-id (polarcl:request-principal req))))
+        (assert (eq :basic (polarcl:authentication-context-scheme (polarcl:request-authentication req))))
+        ;; No principal may leak to a public dispatch or another request.
+        (polarcl::authenticate-request nil req)
+        (assert (null (polarcl:request-principal req))))
+      (status (polarcl::authenticate-request policy (request)) "401")
+      (let ((req (request (basic "alice" "päss:word"))))
+        (push (make-instance 'polarcl:http-header :name :|authorization| :value "Basic xx") (polarcl:headers req))
+        (status (polarcl::authenticate-request policy req) "400")))
+    (let* ((principal (polarcl:make-principal :id "service" :source "test"))
+           (policy (polarcl::make-authentication-policy :bearer :realm "api")))
+      (polarcl:register-token "opaque-token" principal :realm "api")
+      (let ((response (status (polarcl::authenticate-request policy (request)) "401")))
+        (assert (not (search "error=" (polarcl:http-header response :|WWW-Authenticate|)))))
+      (let ((req (request "bEaReR opaque-token")))
+        (assert (null (polarcl::authenticate-request policy req)))
+        (assert (eq principal (polarcl:request-principal req))))
+      (let ((response (status (polarcl::authenticate-request policy (request "Bearer unknown")) "401")))
+        (assert (search "invalid_token" (polarcl:http-header response :|WWW-Authenticate|))))
+      (let ((response (status (polarcl::authenticate-request policy (request "Bearer two tokens")) "400")))
+        (assert (search "invalid_request" (polarcl:http-header response :|WWW-Authenticate|))))
+      (status (polarcl::authenticate-request policy (request "Bearer opaque-token" :protocol :http)) "403")
+      (polarcl:revoke-token "opaque-token" :realm "api")
+      (status (polarcl::authenticate-request policy (request "Bearer opaque-token")) "401")
+      (polarcl:register-token "expired-token" principal :realm "api" :expires 0)
+      (status (polarcl::authenticate-request policy (request "Bearer expired-token")) "401"))
+    ;; Hooks: exact call count; errors are not authentication rejections; callbacks
+    ;; can set status and run once for dynamic, request and query handlers.
+    (let ((calls 0) (invocations 0))
+      (polarcl:register-authentication-provider :custom :basic
+        (lambda (policy req credentials)
+          (declare (ignore policy req)) (incf calls)
+          (assert (equal "alice" (polarcl:credentials-username credentials)))
+          (polarcl:authentication-success (polarcl:make-principal :id "alice" :source :custom))))
+      (let ((policy (polarcl::make-authentication-policy :basic :realm "private" :provider :custom)))
+        (dolist (kind '(polarcl:dynhtml-handler polarcl:rfunc-handler polarcl:qfunc-handler))
+          (let ((response
+                  (dispatch policy (request (basic "alice" "anything"))
+                    (lambda (&rest args)
+                      (incf invocations)
+                      (let ((response (car (last args))))
+                        (setf (polarcl:status-code response) "403"
+                              (polarcl:status-text response) "Forbidden"
+                              (polarcl:http-body response) "application decision"))
+                      "application decision") kind)))
+            (status response "403")))
+        (assert (= calls 3 invocations))
+        (dispatch policy (request) (lambda (&rest args) (declare (ignore args)) (error "Must not run")))
+        (assert (= calls 3))
+        (polarcl:register-authentication-provider :custom :basic
+          (lambda (&rest args) (declare (ignore args)) (error "SECRET")))
+        (let ((response (status (dispatch policy (request (basic "alice" "x")) #'identity) "500")))
+          (assert (not (search "SECRET" (polarcl:http-body response)))))
+        (polarcl:register-authentication-provider :custom :basic
+          (lambda (&rest args) (declare (ignore args)) (polarcl:authentication-rejected)))
+        (status (dispatch policy (request (basic "alice" "x")) #'identity) "401")))
+    ;; Public registered functions do not need a permissive authorizer.
+    (dolist (kind '(polarcl:rfunc-handler polarcl:qfunc-handler))
+      (status (dispatch nil (request "Bearer invalid")
+                (lambda (handler request response)
+                  (declare (ignore handler))
+                  (assert (null (polarcl:request-principal request)))
+                  (setf (polarcl:http-body response) "public") "public") kind) "200"))
+    (status (dispatch nil (request) (lambda (&rest args) (declare (ignore args)) (error "callback failure"))) "500")
+    ;; Digest: replay, request target/query, method, expiry, malformed directives.
+    (polarcl:register-digest-user "alice" "private" :password "secret")
+    (let* ((policy (polarcl::make-authentication-policy :digest :realm "private"))
+           (challenge (polarcl:http-header (polarcl::authenticate-request policy (request)) :|WWW-Authenticate|))
+           (nonce (gethash "nonce" (polarcl::parse-digest-parameters (subseq challenge 7)))))
+      (status (polarcl::authenticate-request policy (request "Digest username=\"alice\", USERNAME=\"bob\"")) "400")
+      (status (polarcl::authenticate-request policy (request (digest-header nonce) :target "/test?x=2")) "400")
+      (let ((req (request (digest-header nonce) :target "/test?x=1")))
+        (assert (null (polarcl::authenticate-request policy req)))
+        (assert (equal "alice" (polarcl:principal-id (polarcl:request-principal req)))))
+      (status (polarcl::authenticate-request policy (request (digest-header nonce) :target "/test?x=1")) "401")
+      (assert (null (polarcl::authenticate-request policy (request (digest-header nonce :nc "00000002") :target "/test?x=1"))))
+      (status (polarcl::authenticate-request policy (request (digest-header nonce :nc "00000003" :method "POST") :target "/test?x=1")) "401")
+      ;; A nonce cannot authenticate against a different route policy.
+      (status (polarcl::authenticate-request
+               (polarcl::make-authentication-policy :digest :realm "private")
+               (request (digest-header nonce :nc "00000003") :target "/test?x=1")) "401")
+      ;; Two simultaneous uses of the same count must not both succeed.
+      (let* ((nonces polarcl::*digest-nonces*) (users polarcl::*digest-users*)
+             (results (make-array 2 :initial-element nil))
+             (threads (loop for index below 2 collect
+                        (let ((index index))
+                          (bordeaux-threads:make-thread
+                           (lambda ()
+                             (let ((polarcl::*digest-nonces* nonces)
+                                   (polarcl::*digest-users* users))
+                               (setf (aref results index)
+                                     (null (polarcl::authenticate-request policy
+                                            (request (digest-header nonce :nc "00000003") :target "/test?x=1")))))))))))
+        (mapc #'bordeaux-threads:join-thread threads)
+        (assert (= 1 (count t results))))
+      (setf (polarcl::digest-nonce-expires (gethash nonce polarcl::*digest-nonces*)) 0)
+      (let ((response (status (polarcl::authenticate-request policy (request (digest-header nonce :nc "00000003") :target "/test?x=1")) "401")))
+        (assert (search "stale=true" (polarcl:http-header response :|WWW-Authenticate|)))))
+    (assert (equal "Jäsøn Doe"
+                   (polarcl::digest-username
+                    (polarcl::parse-digest-parameters "username*=UTF-8''J%C3%A4s%C3%B8n%20Doe"))))
+    (assert (failure-p (lambda () (polarcl::digest-username
+                                   (polarcl::parse-digest-parameters "username=alice, username*=UTF-8''bob")))))
+    ;; RFC 7616 section 3.9.1 SHA-256 published example (independent expected proof).
+    (polarcl:register-digest-user "Mufasa" "http-auth@example.org" :password "Circle of Life")
+    (let* ((policy (polarcl::make-authentication-policy :digest :realm "http-auth@example.org"))
+           (nonce "7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v")
+           (header (format nil "Digest username=~s, realm=~s, nonce=~s, uri=~s, algorithm=SHA-256, qop=auth, nc=00000001, cnonce=~s, response=~s"
+                           "Mufasa" "http-auth@example.org" nonce "/dir/index.html"
+                           "f2/wE4q74E6zIJEtWaHKaf5wv/H5QzzpXusqGemxURZJ"
+                           "753927fa0e85d155564e2e272a28d1802ca10daf4496794697cf8db5856cb6c1")))
+      (setf (gethash nonce polarcl::*digest-nonces*) (polarcl::make-digest-nonce :policy policy :expires (+ 300 (get-universal-time))))
+      (assert (null (polarcl::authenticate-request policy (request header :target "/dir/index.html"))))))
+  (format t "~&PolarCL authentication tests passed.~%") t)

@@ -13,7 +13,7 @@
    (port :accessor http-port :initarg :port)
    (headers :accessor headers :initarg :headers :initform ())
    (body :accessor body :initarg :body :initform "")
-   (authentication-state :accessor authentication-state :initform nil)))
+   (authentication-context :accessor request-authentication :initform nil)))
 
 (defmethod http-protocol ((request http-basic))
   (etypecase (connection request)
@@ -26,7 +26,8 @@
 (defmethod print-object ((object http-header) stream)
   (format stream "  ~a: ~a"
           (field-name object)
-          (field-value object)))
+          (if (member (field-name object) '("Authorization" "Proxy-Authorization" "Cookie" "Set-Cookie") :test #'string-equal)
+              "[redacted]" (field-value object))))
 
 (defclass http-response (http-basic)
   ((request :reader request :initarg :request)
@@ -44,7 +45,8 @@
   (apply #'make-instance 'http-response args))
 
 (defclass http-request (http-basic)
-  ((http-method :accessor http-method :allocation :class)
+  ((request-target :accessor request-target :initarg :request-target :initform nil)
+   (http-method :accessor http-method :allocation :class)
    ;; PATH is a list similar to pathname-directory. HTTP-PATH converts to a string.
    (path :accessor path :initarg :path :initform ())
    (parameters :accessor parameters :initarg :parameters)
@@ -229,15 +231,6 @@
                                 (make-instance 'http-header :name :|Location| :value  location)
                                 (make-instance 'http-header :name :|Connection| :value "close")
                                 (make-instance 'http-header :name :|Server| :value "PolarCL"))))
-
-(defun make-authenticate-response (handler request &key (realm nil))
-  (make-http-response :request request
-                      :status-code "401"
-                      :status-text "Not Authorized"
-                      :headers (list (make-instance 'http-header :name :|WWW-Authenticate| :value (format () "Basic realm=~a" (or realm (handler-realm handler))))
-                                     (make-instance 'http-header :name :|Access-Control-Allow-Origin| :value "*")
-                                     (make-instance 'http-header :name :|Connection| :value "close")
-                                     (make-instance 'http-header :name :|Server| :value "PolarCL"))))
 
 (defun make-notfound-response (handler request)
   (make-http-response :request request
