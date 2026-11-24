@@ -35,7 +35,13 @@
 ;;; HTTP Server-  configuration variables
 
 (defclass http-server ()
-  ((port
+  ((websocket-limit :reader server-websocket-limit :initarg :max-websockets :initform 100)
+   (websocket-workers :reader server-websocket-workers :initarg :websocket-workers :initform 4)
+   (websockets :accessor server-websockets :initform nil)
+   (ws-retiring :accessor server-ws-retiring :initform nil)
+   (ws-lock :reader server-ws-lock :initform (bordeaux-threads:make-lock "websockets"))
+   (ws-pool :accessor server-ws-pool :initform nil)
+   (port
     :reader server-port :initarg :port :initform  "8080")
    (hostname
     :reader server-hostname :initarg :hostname :initform "localhost")
@@ -130,7 +136,8 @@
   (log2:info "Stopping server ~a" server)
   ;; Threads cannot be killed when waiting in ACCEPT or POLL.
   ;; Call mbedtls-net-accept with a timeout and simply allow the threads to expire.
-  (setf (server-running server) nil))
+  (setf (server-running server) nil)
+  (stop-websockets server))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Multithreaded HTTP Server
@@ -150,6 +157,8 @@
                         (:ondemand
                          (server-loop-ondemand http-server))))
                  (when (socket-server http-server)
+                   (stop-websockets http-server)
+                   (wait-websockets http-server)
                    (log2:info "Releasing ~a:~a~%" (server-hostname http-server) (server-port http-server))
                    (mbedtls:close-socket (socket-server http-server))
                    (mbedtls:deallocate (socket-server http-server))
@@ -195,38 +204,42 @@
   (bordeaux-threads:with-lock-held (+handler-count-lock+)
     (decf *handler-count*)))
 
+(defun serve-owned-connection (server connection)
+  "The HTTP worker owns cleanup unless it transfers to a WebSocket I/O owner."
+  (let ((transferred nil))
+    (unwind-protect
+         (let ((upgrade (handle-connection server connection)))
+           (when upgrade
+             (handler-case
+                 (progn (start-websocket upgrade) (setf transferred t))
+               (error (condition)
+                 (cancel-websocket upgrade)
+                 (log2:error "Cannot start WebSocket: ~a" condition)))))
+      (unless transferred
+        (mbedtls:close-socket connection)
+        (mbedtls:deallocate connection)))))
+
 (defun server-loop-ondemand (http-server)
-  (let ((server (socket-server http-server))
-        (thread-id 0))
-    (flet ((on-demand-loop% ()
-             (do ()
-                 ((not (server-running http-server))
-                  (log2:info "Terminating.")
-                  t)
-               (handler-case 
-                   (cond
-                     ((>= *handler-count* (server-max-handlers http-server))
-                      (log2:info "Handler count reached, waiting 0.5s")
-                      (sleep 0.5))
-                     (t
-                      (log2:trace "Accepting a new connection")
-                      (unwind-protect 
-                           (mbedtls:with-server-connection-async ((connection server))
-                             (increase-handler-count)
-                             (log2:debug "Accepted a new connection (now active: ~a/~a)" *handler-count*  (server-max-handlers http-server))
-                             (handle-connection http-server connection))
-                        (decrease-handler-count))))
-                 (mbedtls:stream-timeout (e)
-                   (log2:info "Timeout: ~a" e))
-                 (error (e)
-                   (log2:error "~a" e))
-                 ))))
-      (bordeaux-threads:make-thread #'on-demand-loop% :name "ON-DEMAND-LOOP")
-      (do ()
-          ((not (server-running http-server))
-           (log2:info "Terminating.")
-           t)
-        (sleep *loop-delay*)))))
+  (loop while (server-running http-server)
+        do (handler-case
+               (if (>= *handler-count* (server-max-handlers http-server))
+                   (sleep 0.05)
+                   (let ((connection (mbedtls:accept (socket-server http-server))))
+                     (when connection
+                       (increase-handler-count)
+                       (handler-case
+                           (bordeaux-threads:make-thread
+                            (lambda ()
+                              (unwind-protect
+                                   (serve-owned-connection http-server connection)
+                                (decrease-handler-count)))
+                            :name "HTTP connection")
+                         (error (condition)
+                           (decrease-handler-count)
+                           (mbedtls:close-socket connection)
+                           (mbedtls:deallocate connection)
+                           (error condition))))))
+             (error (condition) (log2:warning "Accept failed: ~a" condition)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; "thread pool": Create a fixed pool of handler. All threads are blocked in poll().
@@ -264,11 +277,10 @@
     (handler-case
         (progn
           (log2:trace "Accepting a new connection")
-          (mbedtls:with-server-connection ((conn server))
-            (when (and conn (server-running http-server))
+          (let ((conn (mbedtls:accept server)))
+            (when conn
               (incf requests)
-              (log2:trace "Accepted connection ~d" requests)
-              (handle-connection http-server conn))))
+              (serve-owned-connection http-server conn))))
       (mbedtls:stream-timeout (e)
         (log2:info "Timeout: ~a" e))
       (error (e)
@@ -315,7 +327,8 @@
              (let* ((start-time (get-internal-real-time))
                     (request-line (get-request-line))
                     ;; ToDo: Create request now?
-                    (request nil))
+                    (request nil)
+                    (upgrading nil))
                (log2:trace "<<< ~a" request-line)
                (when (null request-line) (go :finish))
                (handler-case
@@ -334,6 +347,10 @@
                               ;; Keep alive only if the response requests it.
                               (and (string= connection-header "keep-alive")
                                    (keepalive-p request start-time))))
+                       (when (response-upgrade response)
+                         (setf upgrading (response-upgrade response))
+                         (write-response connection response)
+                         (return-from handle-connection upgrading))
                        (log2:debug "Connection: ~a" connection)
                        ;; Response post-processing: KeepAlive?
                        (cond
@@ -359,6 +376,9 @@
                          (log2:debug "Keep-Alive: ready")
                          (go :start))))
                  (error (e)
+                   (when upgrading
+                     (cancel-websocket upgrading)
+                     (return-from handle-connection nil))
                    (log2:warning "~a Caught error: ~a" (mbedtls:peer connection) e)
                    (handler-case
                        (write-response connection

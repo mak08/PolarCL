@@ -83,5 +83,7 @@ The built-in stores require mbedTLS 3 (PBKDF2), SBCL and `/dev/urandom`.
 
 PUT bodies are read and available to application handlers; resource creation or
 replacement must be implemented by the application. See the manual for current
-limitations, including experimental WebSocket support.
+limitations. WebSocket routes support text/binary messages and direct JSON
+callbacks over HTTP/1.1 TCP/TLS; see [the manual](Manual.md#websocket-endpoints)
+and [the example](examples/websocket-demo.cl).
 POST requests with an explicit `Content-Length: 0` are handled by the current code.

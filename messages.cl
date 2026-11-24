@@ -30,7 +30,8 @@
               "[redacted]" (field-value object))))
 
 (defclass http-response (http-basic)
-  ((request :reader request :initarg :request)
+  ((upgrade :accessor response-upgrade :initform nil)
+   (request :reader request :initarg :request)
    (status-code :accessor status-code :initarg :status-code)
    (status-text :accessor status-text :initarg :status-text)))
 (defmethod print-object ((object http-response) stream)

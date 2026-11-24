@@ -136,7 +136,13 @@ It is loaded by LOAD. In particular, *package* and other globals are bound as us
                  (request-function
                   `(create-handler 'rfunc-handler :authentication ,policy))
                  (websocket
-                  `(create-handler 'websocket-handler :wsfunction ,websocket :authentication ,policy)))))
+                  (progn
+                    (unless (and (listp websocket) (evenp (length websocket)) (keywordp (first websocket)))
+                      (error "Use :websocket (:on-message function ...), not the obsolete raw callback."))
+                    `(make-websocket-handler :authentication ,policy
+                       ,@(loop for (key value) on websocket by #'cddr
+                               append (list key (if (member key '(:origins :subprotocols))
+                                                    `',value value)))))))))
           `(let ((filter ,filter) (handler ,handler))
              (log2:info "Adding HANDLER ~a ~a" filter handler)
              (register-handler :filter filter :handler handler)))))))

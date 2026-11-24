@@ -25,6 +25,8 @@
                ;; (:file "client")
                (:file "mime-types")
                (:file "handlers")
+               (:file "websocket-codec")
+               (:file "websocket-json")
                (:file "websockets")
                (:file "registered-functions")
                (:file "configuration")))
@@ -38,14 +40,16 @@
                (:file "tests/authentication-tests")
                (:file "tests/head-response-tests")
                (:file "tests/request-charset-tests")
-               (:file "tests/put-request-tests"))
+               (:file "tests/put-request-tests")
+               (:file "tests/websocket-tests"))
   :perform (test-op (operation system)
              (declare (ignore operation system))
              (uiop:symbol-call :polarcl-tests :run-tests)
              (uiop:symbol-call :polarcl-auth-tests :run-tests)
              (uiop:symbol-call :polarcl-head-tests :run-tests)
              (uiop:symbol-call :polarcl-charset-tests :run-tests)
-             (uiop:symbol-call :polarcl-put-tests :run-tests)))
+             (uiop:symbol-call :polarcl-put-tests :run-tests)
+             (uiop:symbol-call :polarcl-websocket-tests :run-tests)))
 
 ;;; EOF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

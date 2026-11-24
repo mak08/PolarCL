@@ -101,6 +101,8 @@ thread alone does not establish successful binding.
 | `:port` | `"8080"` | Service/port string; use strings consistently. |
 | `:mt-method` | `:pooled` | Fixed worker pool; `:ondemand` creates work for accepted connections. |
 | `:max-handlers` | `20` | Pool size or on-demand threshold. The on-demand counter is shared across servers. |
+| `:max-websockets` | `100` | Separate WebSocket session limit, including pending close callbacks. |
+| `:websocket-workers` | `4` | Shared callback pool size; each socket also has one I/O thread. |
 | `:keepalive` | `10000` | Milliseconds allowed while waiting for the next request line, passed to cl-mbedtls. |
 | `:max-keepalive-total-time` | `10000` | Millisecond threshold for reusing a connection; currently measured per request cycle, not total connection age. |
 | `:nodelay` | `t` | Passed to cl-mbedtls to disable Nagle's algorithm. |
@@ -175,10 +177,189 @@ Handler options select one of:
 | `:dynamic` | Function `(server handler request response)`; `dynhtml-handler`. Mutate response; return value is ignored. |
 | `:query-function` | Non-NIL selects `qfunc-handler`; calls a registered function chosen by URL. |
 | `:request-function` | Non-NIL selects `rfunc-handler`; calls a registered function chosen by URL. |
-| `:websocket` | Function `(server handler request response)` after an upgrade handshake; experimental, see limitations. |
+| `:websocket` | Declarative option list with message callbacks; see WebSocket endpoints below. |
 
 All require an explicit `:authentication` choice: NIL for public access, or a
 scheme policy described below. Select one handler kind per form.
+
+### WebSocket endpoints
+
+WebSockets use the same route matching and explicit authentication policy as other
+handlers. The former four-argument raw WebSocket callback is replaced by a literal
+option list. PolarCL sends one HTTP/1.1 upgrade response and transfers connection
+ownership to a nonblocking WebSocket runtime; it does not resume HTTP parsing.
+
+```lisp
+(defun events-open (socket)
+  (setf (polarcl:websocket-data socket) 0))
+
+(defun events-message (socket value)
+  (incf (polarcl:websocket-data socket))
+  (polarcl:websocket-send socket value)) ; JSON echo
+
+(defun events-close (socket code reason clean-p)
+  (declare (ignore socket code reason clean-p)))
+
+(polarcl:handle
+ :request (:path "/events")
+ :handler
+ (:websocket (:format :json
+              :origins ("https://bitsailor.example")
+              :on-open #'events-open
+              :on-message #'events-message
+              :on-close #'events-close)
+  :authentication nil))
+```
+
+The browser can send `JSON.stringify(value)` and read `JSON.parse(event.data)`.
+For development on `http://localhost:8080`, explicitly allow that exact origin.
+Origins include the page's HTTP/HTTPS scheme, hostname and optional port, not the
+WebSocket URL's `ws`/`wss` scheme. The default origin list is empty, so browser
+connections require explicit configuration. Missing Origin headers are rejected
+unless `:allow-missing-origin t` is supplied for non-browser clients. Origin checks
+are independent of authentication and do not identify a client.
+
+Authentication runs before the handshake; rejected requests keep their ordinary
+HTTP status and challenges. `websocket-principal` returns the opening request's
+principal, or NIL for public routes. Message-level permissions remain application
+work. Browser JavaScript's WebSocket constructor does not accept arbitrary
+Authorization headers; configuring a Bearer policy alone does not supply browser
+credentials. This implementation adds no cookie-session or token-query convention.
+
+| Endpoint option | Default | Meaning |
+| --- | --- | --- |
+| `:format` | `:raw` | `:raw` text/binary or `:json` text carrying one JSON value. |
+| `:origins` | NIL | Literal list of exact permitted Origin strings. |
+| `:allow-missing-origin` | NIL | Permit clients that omit Origin. Duplicate Origin fields are rejected. |
+| `:subprotocols` | NIL | Literal list of supported protocol names, in server preference order. Only a name offered by the client is selected. |
+| `:require-subprotocol` | NIL | Reject the handshake if no subprotocol matches. |
+| `:on-handshake` | NIL | Function `(request response)` before upgrade. Return true to accept, false to reject. |
+| `:on-open` | NIL | Function `(socket)` after the upgrade. |
+| `:on-message` | NIL | Function `(socket value)` for each complete message. |
+| `:on-close` | NIL | Function `(socket code reason clean-p)` for cleanup. |
+| `:on-error` | NIL | Function `(socket condition)` for protocol, transport or callback errors. |
+| `:json-reader` | Built-in adapter | Function from JSON text to an application value. |
+| `:json-writer` | Built-in adapter | Function from application value to JSON text. |
+| `:json-depth` | 64 | Maximum incoming JSON nesting, also checked on outgoing JSON text. |
+| `:max-message-size` | 1048576 | Maximum incoming reassembled or outgoing message bytes. |
+| `:max-queue-bytes` | 4194304 | Bound on each direction's queued payload/frame bytes. |
+| `:max-queue-messages` | 64 | Bound on each direction's queued messages/events. |
+| `:ping-interval` | 30 | Seconds between server pings; NIL disables automatic heartbeat. |
+| `:pong-timeout` | 10 | Seconds allowed for a matching pong. |
+| `:close-timeout` | 5 | Seconds allowed to complete WebSocket closing before transport abort. |
+
+All callbacks except `:on-handshake` run on a bounded per-server callback pool.
+Callbacks for one socket are serialized: open first, message/error callbacks, and
+exactly one close callback last. Return values are ignored. Messages waiting when
+a connection starts closing are discarded. Cleanup callbacks still run after
+server stop; an application callback that never returns delays later callbacks
+for that socket, but does not prevent the I/O owner from closing its transport.
+Different sockets may have concurrent callbacks. Keep callbacks short; submit
+lengthy routing calculations to application jobs.
+
+The handshake hook may set rejection status/body or add response headers. Returning
+false with the default 200 status produces 403; an explicitly set rejection status
+is preserved. A non-200 result prevents upgrading even when the hook returns true.
+An exception is handled as an ordinary HTTP handler error. PolarCL owns the upgrade,
+subprotocol, extension and body-framing headers and replaces them on success.
+
+| Public operation | Behavior |
+| --- | --- |
+| `(websocket-send socket value)` | Send with the endpoint's format; raw strings are text, raw octet vectors are binary. |
+| `(websocket-send-text socket string)` | Explicit text send on a raw endpoint. |
+| `(websocket-send-binary socket octets)` | Explicit binary send on a raw endpoint. |
+| `(websocket-close socket :code 1000 :reason "Finished")` | Begin closing. Repeated calls are harmless. |
+| `(websocket-state socket)` | `:open`, `:closing` or `:closed` in application callbacks. |
+| `(websocket-request socket)` | Original opening request. |
+| `(websocket-principal socket)` | Original authenticated principal or NIL. |
+| `(websocket-subprotocol socket)` | Selected subprotocol or NIL. |
+| `(websocket-data socket)` | Application-owned state; supports SETF. |
+
+Sends copy their wire data into a bounded queue and return T when accepted, which
+does not guarantee delivery. They may be called by callbacks or background jobs.
+A full outgoing queue signals `websocket-backpressure`; sends during/after closing
+signal `websocket-closed`. Applications decide whether to drop/coalesce updates or
+close slow clients. A frame already being written counts as additional bounded
+in-flight storage. Incoming queue exhaustion closes with 1008. The active callback
+counts against incoming limits. Control traffic has a separate small bounded queue.
+Connection capacity remains charged until its close callback finishes, so repeated
+connect/disconnect traffic cannot accumulate unlimited callback work.
+
+`websocket-close` discards queued outgoing data and prioritizes close after any
+frame already in flight. It does not guarantee that a preceding send reaches the
+peer. Use an application acknowledgment if that matters. Close reasons are limited
+to 123 UTF-8 bytes. A peer close without a code is reported as 1005; a connection
+lost without a received close frame is reported as 1006. Neither code is sent on
+the wire. `clean-p` means both WebSocket close frames were exchanged.
+
+The runtime handles masking, fragmentation (up to 1024 fragments per message),
+text/binary frames, incremental UTF-8 validation, ping/pong and close. Invalid
+framing closes with 1002, invalid UTF-8/JSON with 1007, oversized messages with
+1009, and unexpected callback errors with 1011. Binary on a JSON endpoint closes
+with 1003. Errors in `on-error` are logged without recursively calling it.
+Heartbeat timeout initiates closing with 1001. `stop-server` similarly initiates
+1001 on active WebSockets and their close deadlines bound transport cleanup.
+
+Only the I/O thread accesses the cl-mbedtls connection. There is no blocking
+`websocket-read` API: `on-message` is the application's read interface. Background
+jobs must synchronize any shared application state themselves; `websocket-data`
+is not a synchronized container. Incoming data never selects a Lisp function;
+only the explicitly configured callbacks are invoked.
+
+#### JSON values
+
+The default adapter uses the existing `makros` system: `macros:parse-json` for
+reading and `macros:json` for writing. Objects are native makros JSON objects,
+accessed with `(macros:joref object "field")`; arrays are vectors. Key spelling is
+preserved and keys are not interned. The exported constants `polarcl:json-true`,
+`polarcl:json-false`, and `polarcl:json-null` are aliases for the symbols
+`macros:true`, `macros:false`, and `macros:json-null`. Makros also accepts T and NIL
+as true and false on output; use an empty vector for an empty array and an empty
+`macros:make-json-object` for an empty object.
+
+Each text message contains exactly one JSON value, with no newline delimiter or
+RPC envelope. Trailing data is rejected. Emoji and Unicode escape handling come
+from makros. Its native object-field behavior is preserved, including retaining
+duplicate fields (`joref` returns the first). Applications can reject duplicates
+in a custom reader if their message schema requires it.
+
+Applications can define `macros:json%` methods for their own value types; the
+default WebSocket JSON writer uses those methods through `macros:json`.
+Serialization follows makros's settings; in particular, its current default float
+format uses four decimal places. Applications needing different number formatting
+should supply a `:json-writer` that applies their chosen serializer settings.
+PolarCL introduces no second JSON object model or custom string escaping.
+
+Custom readers/writers can adapt another representation. They are application code
+and must uphold JSON syntax and type rules; PolarCL still enforces UTF-8, byte
+limits and textual nesting limits. Input nesting is bounded before calling the
+reader. Output nesting is checked after serialization, so application serializers
+are responsible for controlling recursive work on their own values. A reader
+failure closes the connection; semantic validation of a successfully decoded
+message belongs in `on-message` and may send an application error reply.
+
+#### Server settings, scope and tests
+
+`server` accepts `:max-websockets` (default 100) and `:websocket-workers` (default 4).
+Each upgraded connection has one I/O thread, and application callbacks use the
+shared pool. Upgraded connections leave the ordinary HTTP handler count/pool.
+Do not deallocate the underlying listener/configuration while its WebSocket I/O
+owners are running; normal server shutdown waits for their transport cleanup.
+The initial HTTP/TLS acceptance path retains its existing blocking behavior.
+
+This version supports server-side HTTP/1.1 `ws://` and `wss://`. Compression and
+other extensions are not negotiated. HTTP/2/3 extended CONNECT, WebSocket client
+mode, automatic reconnection and streaming partial application messages are not
+implemented. This is a basic tested implementation, not a claim of comprehensive
+protocol conformance.
+
+`asdf:test-system "polarcl"` runs the basic WebSocket tests alongside existing
+regressions. Tests cover parsing and malformed frames, JSON, handshakes, queue
+limits, callback order, and independent Python peers over TCP and TLS. The tests
+need Python 3, OpenSSL for disposable certificates, and loopback socket access;
+they do not use Autobahn or deployment credentials. Run in an isolated Lisp image,
+because integration tests temporarily replace global route registrations.
+See `examples/websocket-demo.cl` for a complete browser-compatible JSON echo route.
 
 ### Static files
 
@@ -579,10 +760,10 @@ code. Older files under `examples/` contain obsolete forms: missing `:protocol`,
 positional `user`, `:max-threads`, scalar filter ports, symbol-only
 `register-function`, and incorrect callback arities. Do not copy them unchanged.
 
-WebSocket configuration performs a handshake and calls the four-argument callback,
-but there is no public frame read/write API; ordinary response processing also
-continues afterward. Treat it as experimental, not a complete WebSocket service.
-Static uploads and automatic JSON serialization are not implemented. Request parsing and response compression have limited negotiation;
+WebSockets support HTTP/1.1 text/binary messages and an explicit JSON mode; extensions,
+HTTP/2/3 WebSockets and client mode are not implemented. See the WebSocket section
+for limits and test coverage. Static uploads and automatic JSON serialization of
+ordinary HTTP responses are not implemented. Request parsing and response compression have limited negotiation;
 this manual describes actual behavior rather than claiming full HTTP compliance.
 
 Implementation map: [configuration.cl](configuration.cl) contains the configuration
