@@ -1,7 +1,4 @@
 (in-package :polarcl)
-(defconstant json-true 'macros:true)
-(defconstant json-false 'macros:false)
-(defconstant json-null 'macros:json-null)
 
 (defun ws-json-depth-check (text limit)
   ;; Bound recursion before invoking a parser, including application adapters.

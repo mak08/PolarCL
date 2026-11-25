@@ -315,8 +315,7 @@ only the explicitly configured callbacks are invoked.
 The default adapter uses the existing `makros` system: `macros:parse-json` for
 reading and `macros:json` for writing. Objects are native makros JSON objects,
 accessed with `(macros:joref object "field")`; arrays are vectors. Key spelling is
-preserved and keys are not interned. The exported constants `polarcl:json-true`,
-`polarcl:json-false`, and `polarcl:json-null` are aliases for the symbols
+preserved and keys are not interned. JSON literals are represented by the symbols
 `macros:true`, `macros:false`, and `macros:json-null`. Makros also accepts T and NIL
 as true and false on output; use an empty vector for an empty array and an empty
 `macros:make-json-object` for an empty object.
