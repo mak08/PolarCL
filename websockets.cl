@@ -8,10 +8,15 @@
 (defun ws-option (handler key) (getf (ws-options handler) key))
 (defun make-websocket-handler (&key authentication (format :raw) origins (allow-missing-origin nil)
                                    subprotocols require-subprotocol on-handshake on-open on-message on-close on-error
+                                   (compression nil) (compression-threshold 1024) (max-compressed-message-size nil)
                                    (json-reader #'ws-json-read) (json-writer #'ws-json-write)
                                    (max-message-size 1048576) (max-queue-bytes 4194304)
                                    (max-queue-messages 64) (json-depth 64)
                                    (ping-interval 30) (pong-timeout 10) (close-timeout 5))
+  (unless (member compression '(nil :permessage-deflate)) (error "Unsupported WebSocket compression."))
+  (check-type compression-threshold (integer 0))
+  (setf max-compressed-message-size (or max-compressed-message-size max-message-size))
+  (check-type max-compressed-message-size (integer 1))
   (unless (member format '(:raw :json)) (error "WebSocket format must be :RAW or :JSON."))
   (dolist (limit (list max-message-size max-queue-bytes max-queue-messages json-depth))
     (check-type limit (integer 1)))
@@ -25,7 +30,8 @@
     (error "Origins and subprotocols must be literal lists of strings."))
   (when (and require-subprotocol (null subprotocols)) (error "Required subprotocol list is empty."))
   (make-instance 'websocket-handler :authentication authentication
-    :options (list :format format :origins origins :allow-missing-origin allow-missing-origin
+    :options (list :compression compression :compression-threshold compression-threshold
+                   :max-compressed-message-size max-compressed-message-size :format format :origins origins :allow-missing-origin allow-missing-origin
                    :subprotocols subprotocols :require-subprotocol require-subprotocol
                    :on-handshake on-handshake :on-open on-open :on-message on-message
                    :on-close on-close :on-error on-error :json-reader json-reader :json-writer json-writer
@@ -39,6 +45,7 @@
    (request :reader websocket-request :initarg :request)
    (connection :reader ws-connection :initarg :connection)
    (subprotocol :reader websocket-subprotocol :initarg :subprotocol)
+   (compression :reader websocket-compression :initarg :compression :initform nil)
    (data :accessor websocket-data :initform nil)
    (lock :reader ws-lock :initform (bordeaux-threads:make-lock "WebSocket"))
    (state :accessor ws-state :initform :connecting)
@@ -115,7 +122,9 @@
               (return-from handshake response))
             (unless (equal "200" (status-code response)) (return-from handshake response)))
           ;; Reserve capacity before sending 101. The HTTP owner cancels on write failure.
-          (let ((socket (reserve-websocket server handler connection request protocol)))
+          (let* ((extension (when (ws-option handler :compression) (ws-negotiate-deflate request)))
+                 (socket (reserve-websocket server handler connection request protocol
+                                            (when extension :permessage-deflate))))
             (unless socket (reject "503" "WebSocket capacity exhausted"))
             (setf (response-upgrade response) socket)
             (setf (status-code response) "101" (status-text response) "Switching Protocols"
@@ -133,6 +142,7 @@
                   (base64:usb8-array-to-base64-string
                    (mbedtls:mbedtls-md (concatenate 'string key "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
                                        :method "SHA1" :result-type :bytes)))
+            (when extension (setf (http-header response :|Sec-WebSocket-Extensions|) extension))
             (when protocol (setf (http-header response :|Sec-WebSocket-Protocol|) protocol))
             response))))))
 
@@ -204,7 +214,7 @@
               (setf (server-ws-retiring (ws-server socket))
                     (delete socket (server-ws-retiring (ws-server socket)))))))))))
 
-(defun reserve-websocket (server handler connection request protocol)
+(defun reserve-websocket (server handler connection request protocol &optional compression)
   (bordeaux-threads:with-lock-held ((server-ws-lock server))
     (unless (and (server-running server) (< (+ (length (server-websockets server)) (length (server-ws-retiring server))) (server-websocket-limit server)))
       (return-from reserve-websocket nil))
@@ -218,7 +228,7 @@
               (loop repeat (server-websocket-workers server) collect
                 (bordeaux-threads:make-thread (lambda () (ws-callback-worker server pool)) :name "WebSocket callback")))))
     (let ((socket (make-instance 'websocket :server server :handler handler :connection connection
-                                 :request request :subprotocol protocol)))
+                                 :request request :subprotocol protocol :compression compression)))
       (setf (ws-wakeup socket) (mbedtls:make-io-wakeup))
       (push socket (server-websockets server)) socket)))
 (defun cancel-websocket (socket)
@@ -231,7 +241,11 @@
 
 (defun ws-queue-frame (socket opcode payload)
   (when (> (length payload) (ws-setting socket :max-message-size)) (error "Outgoing WebSocket message too large."))
-  (let ((frame (ws-frame opcode payload)))
+  (let ((frame (if (and (websocket-compression socket)
+                        (>= (length payload) (ws-setting socket :compression-threshold)))
+                   (multiple-value-bind (bytes compressed) (ws-deflate-message payload)
+                     (ws-frame opcode bytes t compressed))
+                   (ws-frame opcode payload))))
     (bordeaux-threads:with-lock-held ((ws-lock socket))
       (unless (eq (ws-state socket) :open) (error 'websocket-closed))
       (when (or (>= (length (ws-out socket)) (ws-setting socket :max-queue-messages))
@@ -282,7 +296,9 @@
 
 (defun run-websocket (socket)
   (let ((connection (ws-connection socket))
-        (decoder (make-ws-decoder :max-size (ws-setting socket :max-message-size)))
+        (decoder (make-ws-decoder :max-size (ws-setting socket :max-message-size)
+                                  :compression (websocket-compression socket)
+                                  :max-compressed-size (ws-setting socket :max-compressed-message-size)))
         (input (ws-bytes 16384)) (out nil) (offset 0) (pending nil) (out-close nil)
         (controls nil) (read-want :want-read) (write-want :want-write)
         (last-ping (ws-now)) (ping-token nil) (ping-deadline nil) (serial 0) (failed nil))

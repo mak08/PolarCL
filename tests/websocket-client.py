@@ -7,15 +7,16 @@ import socket
 import ssl
 import struct
 import sys
+import zlib
 
 PORT = int(sys.argv[1])
 TLS = len(sys.argv) > 2 and sys.argv[2] == "tls"
 
-def frame(opcode, payload=b"", final=True, masked=True):
+def frame(opcode, payload=b"", final=True, masked=True, compressed=False):
     if isinstance(payload, str):
         payload = payload.encode()
     size = len(payload)
-    header = bytes([(128 if final else 0) | opcode])
+    header = bytes([(128 if final else 0) | (64 if compressed else 0) | opcode])
     maskbit = 128 if masked else 0
     if size < 126:
         header += bytes([maskbit | size])
@@ -29,7 +30,7 @@ def frame(opcode, payload=b"", final=True, masked=True):
     return header + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
 
 class Peer:
-    def __init__(self, path="/raw", extra=b"", origin="https://example.test", version="13"):
+    def __init__(self, path="/raw", extra=b"", origin="https://example.test", version="13", extensions=None):
         self.socket = socket.create_connection(("127.0.0.1", PORT), timeout=5)
         if TLS:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -38,9 +39,12 @@ class Peer:
             self.socket = context.wrap_socket(self.socket, server_hostname="localhost")
         self.buffer = b""
         key = base64.b64encode(os.urandom(16)).decode()
+        self.compression = False
+        self.last_compressed = False
+        extension_header = f"Sec-WebSocket-Extensions: {extensions}\r\n" if extensions else ""
         request = (f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive, Upgrade\r\n"
                    f"Upgrade: websocket\r\nOrigin: {origin}\r\nSec-WebSocket-Version: {version}\r\n"
-                   f"Sec-WebSocket-Key: {key}\r\n\r\n").encode()
+                   f"Sec-WebSocket-Key: {key}\r\n{extension_header}\r\n").encode()
         self.socket.sendall(request + extra)
         while b"\r\n\r\n" not in self.buffer:
             data = self.socket.recv(4096)
@@ -53,6 +57,11 @@ class Peer:
             assert expected in self.headers
             assert b"connection: close" not in self.headers.lower()
             assert b"content-length" not in self.headers.lower()
+            self.compression = b"sec-websocket-extensions:" in self.headers.lower()
+            if self.compression:
+                assert extensions is not None
+                assert b"server_no_context_takeover" in self.headers
+                assert b"client_no_context_takeover" in self.headers
     def read(self, count):
         while len(self.buffer) < count:
             data = self.socket.recv(65536)
@@ -62,14 +71,20 @@ class Peer:
         return out
     def receive(self):
         first, second = self.read(2)
-        assert first & 128 and not first & 112, "Unexpected fragmentation/extension"
+        assert first & 128 and not first & 48, "Unexpected fragmentation/extension"
+        self.last_compressed = bool(first & 64)
+        if self.last_compressed:
+            assert self.compression and first & 15 in (1, 2)
         assert not second & 128, "Server frames must be unmasked"
         size = second & 127
         if size == 126:
             size = struct.unpack("!H", self.read(2))[0]
         elif size == 127:
             size = struct.unpack("!Q", self.read(8))[0]
-        return first & 15, self.read(size)
+        payload = self.read(size)
+        if self.last_compressed:
+            payload = zlib.decompressobj(-15).decompress(payload + b"\x00\x00\xff\xff")
+        return first & 15, payload
     def send(self, opcode, data=b"", final=True):
         self.socket.sendall(frame(opcode, data, final))
     def close(self):
@@ -132,6 +147,67 @@ p.send(1, "close")
 op, data = p.receive()
 assert op == 8 and data == struct.pack("!H", 1000) + b"done"
 p.send(8, data)
+p.socket.close()
+
+# Compression negotiation is opt-in and may decline unsupported offers.
+for path, offer, accepted in (
+    ("/raw", "permessage-deflate", False),
+    ("/compressed", None, False),
+    ("/compressed", "permessage-deflate; server_max_window_bits=14", False),
+    ("/compressed", "permessage-deflate; client_max_window_bits; client_max_window_bits", False),
+    ("/compressed", "permessage-deflate; server_max_window_bits=14, permessage-deflate; client_max_window_bits", True),
+    ("/compressed", 'permessage-deflate; server_max_window_bits="15"', True),
+):
+    p = Peer(path, extensions=offer)
+    assert p.status == 101 and p.compression == accepted
+    assert p.receive() == (1, b"ready") and not p.last_compressed
+    p.send(1, "small")
+    assert p.receive() == (1, b"small") and not p.last_compressed
+    p.close()
+
+def compressed_payload(payload):
+    compressor = zlib.compressobj(wbits=-15)
+    return (compressor.compress(payload) + compressor.flush(zlib.Z_SYNC_FLUSH))[:-4]
+
+p = Peer("/compressed", extensions="permessage-deflate; client_max_window_bits")
+p.receive()
+for payload in (b"", b"x" * 4000, b"x" * 4000, "😀".encode() * 400):
+    wire = compressed_payload(payload)
+    p.socket.sendall(frame(1, wire[:2], final=False, compressed=True))
+    p.send(9, b"interleaved")
+    assert p.receive() == (10, b"interleaved") and not p.last_compressed
+    p.send(0, wire[2:])
+    assert p.receive() == (1, payload)
+    assert p.last_compressed == (len(payload) >= 128)
+# Large incompressible messages are sent unchanged; compression is per-message.
+payload = os.urandom(3000)
+p.send(2, payload)
+assert p.receive() == (2, payload) and not p.last_compressed
+p.close()
+
+p = Peer("/compressed-json", extensions="permessage-deflate")
+p.receive()
+value = {"message": "😀" * 500, "flags": [True, False, None]}
+p.socket.sendall(frame(1, compressed_payload(json.dumps(value).encode()), compressed=True))
+op, data = p.receive()
+assert op == 1 and p.last_compressed and json.loads(data) == value
+p.close()
+
+for payload, expected in ((compressed_payload(b"a" * 10000), 1009),
+                          (b"\x07", 1002), (b"\xf2\x48", 1002),
+                          (compressed_payload(b"\xff"), 1007)):
+    p = Peer("/compressed", extensions="permessage-deflate")
+    p.receive()
+    p.socket.sendall(frame(1, payload, compressed=True))
+    op, data = p.receive()
+    assert op == 8 and not p.last_compressed and struct.unpack("!H", data[:2])[0] == expected
+    p.socket.close()
+
+p = Peer("/raw", extensions="permessage-deflate")
+p.receive()
+p.socket.sendall(frame(1, compressed_payload(b"bad"), compressed=True))
+op, data = p.receive()
+assert op == 8 and struct.unpack("!H", data[:2])[0] == 1002
 p.socket.close()
 
 # Close deadline: a peer that does not reply cannot hold the transport open.

@@ -175,6 +175,19 @@
                            :on-message #'message :on-close #'closed :on-error #'errored
                            :ping-interval nil :close-timeout 0.3)
                 :authentication nil))
+    (polarcl:handle :request (:path "/compressed")
+      :handler (:websocket (:format :raw :origins ("https://example.test") :on-open #'opened
+                           :on-message #'message :on-close #'closed :on-error #'errored
+                           :compression :permessage-deflate :compression-threshold 128
+                           :max-message-size 4096 :max-compressed-message-size 5000
+                           :ping-interval nil :close-timeout 0.3)
+                :authentication nil))
+    (polarcl:handle :request (:path "/compressed-json")
+      :handler (:websocket (:format :json :origins ("https://example.test") :on-open #'opened
+                           :on-message #'message :on-close #'closed :on-error #'errored
+                           :compression :permessage-deflate :compression-threshold 128
+                           :ping-interval nil :close-timeout 0.3)
+                :authentication nil))
     (polarcl:handle :request (:path "/heartbeat")
       :handler (:websocket (:format :raw :origins ("https://example.test") :on-open #'opened
                            :on-message #'message :on-close #'closed :on-error #'errored
@@ -210,7 +223,7 @@
             (assert (= 1 (count :open kinds))) (assert (= 1 (count :close kinds)))))))))
 
 (defun run-tests ()
-  (test-codec) (test-json) (test-handshake) (test-queues)
+  (test-codec) (test-json) (test-handshake) (test-queues) (test-compression)
   (let* ((names '(polarcl::*handlers* polarcl::*exact-handlers* polarcl::*prefix-handlers*
                   polarcl::*regex-handlers* polarcl::*redirectors* polarcl::*servers*))
          (saved (mapcar #'symbol-value names)))

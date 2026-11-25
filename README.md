@@ -28,8 +28,9 @@ With PolarCL and its dependencies available to ASDF:
 ```
 
 Both commands run the configuration/authorization, HTTP response and request
-charset and PUT regression suites, including authentication protocols, HEAD, UTF-8 lengths and gzip. Tests use captured output rather
-than network listeners and isolate configuration registries. Assertion failures
+charset and PUT regression suites, including authentication protocols, HEAD, UTF-8 lengths and gzip. HTTP tests use captured output and isolate configuration registries. WebSocket
+tests include independent Python peers over loopback TCP/TLS, including compression;
+they require Python 3, OpenSSL and permission to open loopback sockets. Assertion failures
 signal errors. Loading `polarcl` alone does not load or run the tests.
 
 ## Description
@@ -84,6 +85,6 @@ The built-in stores require mbedTLS 3 (PBKDF2), SBCL and `/dev/urandom`.
 PUT bodies are read and available to application handlers; resource creation or
 replacement must be implemented by the application. See the manual for current
 limitations. WebSocket routes support text/binary messages and direct JSON
-callbacks over HTTP/1.1 TCP/TLS; see [the manual](Manual.md#websocket-endpoints)
+callbacks over HTTP/1.1 TCP/TLS, with opt-in permessage-deflate compression; see [the manual](Manual.md#websocket-endpoints)
 and [the example](examples/websocket-demo.cl).
 POST requests with an explicit `Content-Length: 0` are handled by the current code.

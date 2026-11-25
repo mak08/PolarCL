@@ -241,7 +241,10 @@ credentials. This implementation adds no cookie-session or token-query conventio
 | `:json-reader` | Built-in adapter | Function from JSON text to an application value. |
 | `:json-writer` | Built-in adapter | Function from application value to JSON text. |
 | `:json-depth` | 64 | Maximum incoming JSON nesting, also checked on outgoing JSON text. |
-| `:max-message-size` | 1048576 | Maximum incoming reassembled or outgoing message bytes. |
+| `:compression` | NIL | Opt in with `:permessage-deflate`. |
+| `:compression-threshold` | 1024 | Minimum outgoing message bytes before trying compression. |
+| `:max-compressed-message-size` | `:max-message-size` | Maximum incoming compressed message bytes, summed across fragments. |
+| `:max-message-size` | 1048576 | Maximum incoming decompressed/reassembled or outgoing uncompressed message bytes. |
 | `:max-queue-bytes` | 4194304 | Bound on each direction's queued payload/frame bytes. |
 | `:max-queue-messages` | 64 | Bound on each direction's queued messages/events. |
 | `:ping-interval` | 30 | Seconds between server pings; NIL disables automatic heartbeat. |
@@ -273,6 +276,7 @@ subprotocol, extension and body-framing headers and replaces them on success.
 | `(websocket-request socket)` | Original opening request. |
 | `(websocket-principal socket)` | Original authenticated principal or NIL. |
 | `(websocket-subprotocol socket)` | Selected subprotocol or NIL. |
+| `(websocket-compression socket)` | Negotiated `:permessage-deflate` or NIL. |
 | `(websocket-data socket)` | Application-owned state; supports SETF. |
 
 Sends copy their wire data into a bounded queue and return T when accepted, which
@@ -338,6 +342,50 @@ are responsible for controlling recursive work on their own values. A reader
 failure closes the connection; semantic validation of a successfully decoded
 message belongs in `on-message` and may send an application error reply.
 
+#### Compression
+
+Add `:compression :permessage-deflate` to the `:websocket` options to enable
+[RFC 7692](https://www.rfc-editor.org/rfc/rfc7692.html) negotiation:
+
+```lisp
+(polarcl:handle
+ :request (:path "/compressed")
+ :handler
+ (:websocket (:format :raw
+              :origins ("https://example.test")
+              :compression :permessage-deflate
+              :compression-threshold 1024
+              :max-message-size 1048576
+              :max-compressed-message-size 1048576
+              :on-message (lambda (socket message)
+                            (polarcl:websocket-send socket message)))
+  :authentication nil))
+```
+
+Compression requires a compatible client offer. Otherwise the connection upgrades
+normally without compression. PolarCL selects a compatible `permessage-deflate`
+offer and requires both `server_no_context_takeover` and
+`client_no_context_takeover`: each message has independent compression history.
+This version uses 15-bit windows only. Offers requesting smaller windows, unknown
+parameters or duplicate parameters are declined; a later compatible offer can
+still be accepted. Valueless `client_max_window_bits` and window values of 15
+are supported. Other extensions are not negotiated.
+
+Callbacks and send APIs are unchanged, including JSON mode. Incoming compressed
+fragments are buffered under `:max-compressed-message-size`, then inflated under
+`:max-message-size` before UTF-8/JSON validation and callback delivery. Control
+frames can be interleaved and are never compressed. Invalid DEFLATE data or message
+boundaries close with 1002; either byte limit closes with 1009. These limits bound
+payload sizes, not total memory: reassembly and decompression require temporary
+buffers in addition to queued messages.
+
+Outgoing messages at or above `:compression-threshold` are compressed only when
+this makes their payload smaller. Smaller or incompressible messages remain plain,
+even on a negotiated connection. The threshold does not restrict incoming
+compressed messages. Outgoing queues count the actual encoded frame bytes;
+incoming queues count decompressed payload bytes. Compression contexts are freed
+after each message, including on errors.
+
 #### Server settings, scope and tests
 
 `server` accepts `:max-websockets` (default 100) and `:websocket-workers` (default 4).
@@ -347,15 +395,16 @@ Do not deallocate the underlying listener/configuration while its WebSocket I/O
 owners are running; normal server shutdown waits for their transport cleanup.
 The initial HTTP/TLS acceptance path retains its existing blocking behavior.
 
-This version supports server-side HTTP/1.1 `ws://` and `wss://`. Compression and
-other extensions are not negotiated. HTTP/2/3 extended CONNECT, WebSocket client
+This version supports server-side HTTP/1.1 `ws://` and `wss://`. Optional permessage-deflate
+compression is supported with the restrictions above. HTTP/2/3 extended CONNECT, WebSocket client
 mode, automatic reconnection and streaming partial application messages are not
 implemented. This is a basic tested implementation, not a claim of comprehensive
 protocol conformance.
 
 `asdf:test-system "polarcl"` runs the basic WebSocket tests alongside existing
 regressions. Tests cover parsing and malformed frames, JSON, handshakes, queue
-limits, callback order, and independent Python peers over TCP and TLS. The tests
+limits, callback order, compression negotiation, DEFLATE boundaries, compressed
+fragmentation, inflated-size limits, and independent Python peers over TCP and TLS. The tests
 need Python 3, OpenSSL for disposable certificates, and loopback socket access;
 they do not use Autobahn or deployment credentials. Run in an isolated Lisp image,
 because integration tests temporarily replace global route registrations.
@@ -760,8 +809,8 @@ code. Older files under `examples/` contain obsolete forms: missing `:protocol`,
 positional `user`, `:max-threads`, scalar filter ports, symbol-only
 `register-function`, and incorrect callback arities. Do not copy them unchanged.
 
-WebSockets support HTTP/1.1 text/binary messages and an explicit JSON mode; extensions,
-HTTP/2/3 WebSockets and client mode are not implemented. See the WebSocket section
+WebSockets support HTTP/1.1 text/binary messages, an explicit JSON mode and opt-in
+permessage-deflate. Other extensions, HTTP/2/3 WebSockets and client mode are not implemented. See the WebSocket section
 for limits and test coverage. Static uploads and automatic JSON serialization of
 ordinary HTTP responses are not implemented. Request parsing and response compression have limited negotiation;
 this manual describes actual behavior rather than claiming full HTTP compliance.
